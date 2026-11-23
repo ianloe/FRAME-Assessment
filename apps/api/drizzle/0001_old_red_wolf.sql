@@ -1,0 +1,1 @@
+ALTER TABLE "ai_systems" ADD COLUMN "department" text DEFAULT '' NOT NULL;

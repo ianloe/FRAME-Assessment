@@ -30,9 +30,12 @@ export function AdminPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  // Org form
+  // Org & BU form
   const [orgName, setOrgName] = useState('');
   const [orgSlug, setOrgSlug] = useState('');
+  const [buOrgId, setBuOrgId] = useState('');
+  const [buName, setBuName] = useState('');
+  const [buCode, setBuCode] = useState('');
 
   const { data: usersData, refetch: refetchUsers } = useQuery<{
     users: Array<{
@@ -532,6 +535,66 @@ export function AdminPage() {
               {(orgData?.organisations ?? []).map((o) => (
                 <li key={o.id} className="py-2">
                   <strong>{o.name}</strong> <span className="text-xs text-slate-500">({o.slug})</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="text-lg font-semibold">Business Units</h2>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const targetOrg = buOrgId || orgData?.organisations[0]?.id;
+                if (!targetOrg) return;
+                await apiFetch(`/api/organisations/${targetOrg}/business-units`, {
+                  method: 'POST',
+                  body: JSON.stringify({ name: buName, code: buCode })
+                });
+                setBuName('');
+                setBuCode('');
+                await refetchOrgs();
+              }}
+              className="mt-3 flex flex-wrap gap-3"
+            >
+              <select
+                value={buOrgId || orgData?.organisations[0]?.id || ''}
+                onChange={(e) => setBuOrgId(e.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              >
+                {(orgData?.organisations ?? []).map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                required
+                placeholder="Business Unit Name"
+                value={buName}
+                onChange={(e) => setBuName(e.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+              <input
+                type="text"
+                placeholder="Code (e.g. RB-01)"
+                value={buCode}
+                onChange={(e) => setBuCode(e.target.value)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Add Business Unit
+              </button>
+            </form>
+            <ul className="mt-4 divide-y divide-slate-100 text-sm dark:divide-slate-800">
+              {(orgData?.businessUnits ?? []).map((bu) => (
+                <li key={bu.id} className="py-2">
+                  <strong>{bu.name}</strong>{' '}
+                  {bu.code && <span className="text-xs text-slate-500">({bu.code})</span>}
                 </li>
               ))}
             </ul>

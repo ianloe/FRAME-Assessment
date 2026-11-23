@@ -17,9 +17,12 @@ export async function systemRoutes(app: FastifyInstance) {
         search: z.string().optional(),
         organisationId: z.string().uuid().optional(),
         businessUnitId: z.string().uuid().optional(),
+        department: z.string().optional(),
         lifecycleStage: z.string().optional(),
         riskTier: z.string().optional(),
         regulatoryTag: z.string().optional(),
+        completeness: z.enum(['not_started', 'in_progress', 'complete']).optional(),
+        assessmentStatus: z.string().optional(),
         includeArchived: z.coerce.boolean().default(false)
       })
       .parse(request.query);
@@ -29,25 +32,106 @@ export async function systemRoutes(app: FastifyInstance) {
       .from(schema.aiSystems)
       .orderBy(asc(schema.aiSystems.name));
 
-    const scoped = allSystems.filter((sys) => {
-      if (!query.includeArchived && sys.archivedAt) return false;
-      if (!isEntityInScope(auth.role, auth.scopes, {
-        organisationId: sys.organisationId,
-        businessUnitId: sys.businessUnitId,
-        aiSystemId: sys.id
-      })) {
-        return false;
+    const allOrgs = await db.select().from(schema.organisations);
+    const allBus = await db.select().from(schema.businessUnits);
+    const orgMap = new Map(allOrgs.map((o) => [o.id, o.name]));
+    const buMap = new Map(allBus.map((b) => [b.id, b.name]));
+
+    // Batch-load assessments, dimensions, questions, and response counts (no N+1)
+    const allAssessments = await db
+      .select()
+      .from(schema.assessments)
+      .orderBy(desc(schema.assessments.assessmentDate));
+    const latestAssessmentBySys = new Map<string, (typeof allAssessments)[number]>();
+    for (const a of allAssessments) {
+      if (a.status !== 'archived' && !latestAssessmentBySys.has(a.aiSystemId)) {
+        latestAssessmentBySys.set(a.aiSystemId, a);
       }
+    }
+
+    const allDims = await db.select().from(schema.dimensions);
+    const allQs = await db.select({ id: schema.questions.id, dimensionId: schema.questions.dimensionId }).from(schema.questions);
+    const qCountByDimId = new Map<string, number>();
+    for (const q of allQs) {
+      qCountByDimId.set(q.dimensionId, (qCountByDimId.get(q.dimensionId) ?? 0) + 1);
+    }
+
+    const allResps = await db
+      .select({ assessmentId: schema.responses.assessmentId })
+      .from(schema.responses);
+    const respCountByAssId = new Map<string, number>();
+    for (const r of allResps) {
+      respCountByAssId.set(r.assessmentId, (respCountByAssId.get(r.assessmentId) ?? 0) + 1);
+    }
+
+    const enriched = allSystems
+      .filter((sys) => {
+        if (!query.includeArchived && sys.archivedAt) return false;
+        if (
+          !isEntityInScope(auth.role, auth.scopes, {
+            organisationId: sys.organisationId,
+            businessUnitId: sys.businessUnitId,
+            aiSystemId: sys.id
+          })
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((sys) => {
+        const latest = latestAssessmentBySys.get(sys.id);
+        let totalExpected = 0;
+        let answered = 0;
+        if (latest) {
+          const selectedSet = new Set(latest.selectedDimensionsJson);
+          for (const d of allDims) {
+            if (d.questionnaireVersionId === latest.questionnaireVersionId && selectedSet.has(d.code)) {
+              totalExpected += qCountByDimId.get(d.id) ?? 0;
+            }
+          }
+          answered = respCountByAssId.get(latest.id) ?? 0;
+        }
+        const completenessPercent =
+          totalExpected > 0 ? Math.min(100, Math.round((answered / totalExpected) * 100)) : 0;
+
+        return {
+          ...sys,
+          organisationName: orgMap.get(sys.organisationId) ?? '',
+          businessUnitName: sys.businessUnitId ? buMap.get(sys.businessUnitId) ?? '' : '',
+          latestAssessmentId: latest?.id ?? null,
+          latestAssessmentStatus: latest?.status ?? 'none',
+          latestOverallScore: latest?.overallScore ?? null,
+          completenessPercent
+        };
+      });
+
+    const filtered = enriched.filter((sys) => {
       if (query.organisationId && sys.organisationId !== query.organisationId) return false;
       if (query.businessUnitId && sys.businessUnitId !== query.businessUnitId) return false;
+      if (query.department && !sys.department.toLowerCase().includes(query.department.toLowerCase())) {
+        return false;
+      }
       if (query.lifecycleStage && sys.lifecycleStage !== query.lifecycleStage) return false;
       if (query.riskTier && sys.riskTier !== query.riskTier) return false;
       if (query.regulatoryTag && !sys.regulatoryTags.includes(query.regulatoryTag)) return false;
+      if (query.assessmentStatus && sys.latestAssessmentStatus !== query.assessmentStatus) {
+        return false;
+      }
+      if (query.completeness === 'not_started' && sys.completenessPercent !== 0) return false;
+      if (
+        query.completeness === 'in_progress' &&
+        (sys.completenessPercent === 0 || sys.completenessPercent === 100)
+      ) {
+        return false;
+      }
+      if (query.completeness === 'complete' && sys.completenessPercent !== 100) return false;
       if (query.search) {
         const s = query.search.toLowerCase();
         if (
           !sys.name.toLowerCase().includes(s) &&
           !sys.description.toLowerCase().includes(s) &&
+          !sys.department.toLowerCase().includes(s) &&
+          !sys.businessUnitName.toLowerCase().includes(s) &&
           !sys.aaefReference.toLowerCase().includes(s)
         ) {
           return false;
@@ -56,7 +140,7 @@ export async function systemRoutes(app: FastifyInstance) {
       return true;
     });
 
-    return { aiSystems: scoped };
+    return { aiSystems: filtered };
   });
 
   app.get('/api/ai-systems/export/csv', { preHandler: requireStepUp }, async (request, reply) => {
@@ -167,8 +251,27 @@ export async function systemRoutes(app: FastifyInstance) {
       .where(eq(schema.auditFindings.aiSystemId, id))
       .orderBy(desc(schema.auditFindings.createdAt));
 
+    const [org] = await db
+      .select()
+      .from(schema.organisations)
+      .where(eq(schema.organisations.id, sys.organisationId))
+      .limit(1);
+    const bu = sys.businessUnitId
+      ? (
+          await db
+            .select()
+            .from(schema.businessUnits)
+            .where(eq(schema.businessUnits.id, sys.businessUnitId))
+            .limit(1)
+        )[0]
+      : null;
+
     return {
-      aiSystem: sys,
+      aiSystem: {
+        ...sys,
+        organisationName: org?.name ?? '',
+        businessUnitName: bu?.name ?? ''
+      },
       assessments: systemAssessments,
       actions: systemActions,
       checklists: systemChecklists,
@@ -191,6 +294,7 @@ export async function systemRoutes(app: FastifyInstance) {
       .values({
         organisationId: body.organisationId,
         businessUnitId: body.businessUnitId ?? null,
+        department: body.department,
         ownerId: body.ownerId ?? auth.userId,
         name: body.name,
         description: body.description,

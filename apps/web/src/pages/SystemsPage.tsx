@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Plus, Download, Upload, Search } from 'lucide-react';
+import { Plus, Download, Upload, Search, RotateCcw } from 'lucide-react';
 import { apiFetch, ApiError, downloadFile } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
 interface AISystem {
   id: string;
   organisationId: string;
+  organisationName: string;
+  businessUnitId: string | null;
+  businessUnitName: string;
+  department: string;
   name: string;
   description: string;
   lifecycleStage: string;
@@ -16,6 +20,9 @@ interface AISystem {
   targetMaturityLevel: number;
   regulatoryTags: string[];
   aaefReference: string;
+  latestAssessmentStatus: string;
+  latestOverallScore: number | null;
+  completenessPercent: number;
   isDemo: boolean;
 }
 
@@ -24,10 +31,17 @@ export function SystemsPage() {
   const canEdit = session?.user.role === 'admin' || session?.user.role === 'user';
 
   const [search, setSearch] = useState('');
+  const [businessUnitId, setBusinessUnitId] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [riskTierFilter, setRiskTierFilter] = useState('');
+  const [lifecycleFilter, setLifecycleFilter] = useState('');
+  const [completenessFilter, setCompletenessFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState(
-    'name,description,lifecycleStage,deploymentType,riskTier,targetMaturityLevel,aaefReference\n'
+    'name,description,department,lifecycleStage,deploymentType,riskTier,targetMaturityLevel,aaefReference\n'
   );
   const [importPreview, setImportPreview] = useState<Array<{
     rowNumber: number;
@@ -38,6 +52,8 @@ export function SystemsPage() {
 
   const [form, setForm] = useState({
     organisationId: '',
+    businessUnitId: '',
+    department: '',
     name: '',
     description: '',
     lifecycleStage: 'pilot',
@@ -50,33 +66,73 @@ export function SystemsPage() {
   });
   const [error, setError] = useState('');
 
-  const { data: orgData } = useQuery<{ organisations: Array<{ id: string; name: string }> }>({
+  const { data: orgData } = useQuery<{
+    organisations: Array<{ id: string; name: string }>;
+    businessUnits: Array<{ id: string; organisationId: string; name: string; code: string }>;
+  }>({
     queryKey: ['organisations'],
     queryFn: () => apiFetch('/api/organisations')
   });
 
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (businessUnitId) params.set('businessUnitId', businessUnitId);
+  if (departmentFilter) params.set('department', departmentFilter);
+  if (riskTierFilter) params.set('riskTier', riskTierFilter);
+  if (lifecycleFilter) params.set('lifecycleStage', lifecycleFilter);
+  if (completenessFilter) params.set('completeness', completenessFilter);
+  if (statusFilter) params.set('assessmentStatus', statusFilter);
+
   const { data, isLoading, refetch } = useQuery<{ aiSystems: AISystem[] }>({
-    queryKey: ['ai-systems', search],
-    queryFn: () =>
-      apiFetch(`/api/ai-systems${search ? `?search=${encodeURIComponent(search)}` : ''}`)
+    queryKey: [
+      'ai-systems',
+      search,
+      businessUnitId,
+      departmentFilter,
+      riskTierFilter,
+      lifecycleFilter,
+      completenessFilter,
+      statusFilter
+    ],
+    queryFn: () => apiFetch(`/api/ai-systems?${params.toString()}`)
   });
+
+  const resetFilters = () => {
+    setSearch('');
+    setBusinessUnitId('');
+    setDepartmentFilter('');
+    setRiskTierFilter('');
+    setLifecycleFilter('');
+    setCompletenessFilter('');
+    setStatusFilter('');
+  };
+
+  const selectedOrgId = form.organisationId || orgData?.organisations[0]?.id || '';
+  const availableBus = (orgData?.businessUnits ?? []).filter(
+    (bu) => !selectedOrgId || bu.organisationId === selectedOrgId
+  );
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     try {
-      const orgId = form.organisationId || orgData?.organisations[0]?.id;
-      if (!orgId) {
+      if (!selectedOrgId) {
         setError('Please create an organisation in Administration first.');
         return;
       }
       await apiFetch('/api/ai-systems', {
         method: 'POST',
-        body: JSON.stringify({ ...form, organisationId: orgId })
+        body: JSON.stringify({
+          ...form,
+          organisationId: selectedOrgId,
+          businessUnitId: form.businessUnitId || null
+        })
       });
       setShowCreate(false);
       setForm({
         organisationId: '',
+        businessUnitId: '',
+        department: '',
         name: '',
         description: '',
         lifecycleStage: 'pilot',
@@ -167,15 +223,102 @@ export function SystemsPage() {
         </div>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+      {/* Filter Bar */}
+      <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4 dark:border-slate-800 dark:bg-slate-900">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            type="search"
+            placeholder="Search name, dept, AAEF..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-800"
+          />
+        </div>
+
+        <select
+          aria-label="Filter by Business Unit"
+          value={businessUnitId}
+          onChange={(e) => setBusinessUnitId(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          <option value="">All Business Units</option>
+          {(orgData?.businessUnits ?? []).map((bu) => (
+            <option key={bu.id} value={bu.id}>
+              {bu.name} {bu.code ? `(${bu.code})` : ''}
+            </option>
+          ))}
+        </select>
+
         <input
-          type="search"
-          placeholder="Search AI systems or AAEF references..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+          type="text"
+          aria-label="Filter by Department"
+          placeholder="Filter by Department..."
+          value={departmentFilter}
+          onChange={(e) => setDepartmentFilter(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
         />
+
+        <select
+          aria-label="Filter by Risk Tier"
+          value={riskTierFilter}
+          onChange={(e) => setRiskTierFilter(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          <option value="">All Risk Tiers</option>
+          <option value="low">Low risk</option>
+          <option value="medium">Medium risk</option>
+          <option value="high">High risk</option>
+          <option value="critical">Critical risk</option>
+        </select>
+
+        <select
+          aria-label="Filter by Lifecycle Stage"
+          value={lifecycleFilter}
+          onChange={(e) => setLifecycleFilter(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          <option value="">All Lifecycle Stages</option>
+          <option value="idea">Idea</option>
+          <option value="pilot">Pilot</option>
+          <option value="production">Production</option>
+          <option value="retired">Retired</option>
+        </select>
+
+        <select
+          aria-label="Filter by Completeness"
+          value={completenessFilter}
+          onChange={(e) => setCompletenessFilter(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          <option value="">All Completeness</option>
+          <option value="not_started">Not started (0%)</option>
+          <option value="in_progress">In progress (1% to 99%)</option>
+          <option value="complete">Complete (100%)</option>
+        </select>
+
+        <select
+          aria-label="Filter by Assessment Status"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          <option value="">All Assessment Statuses</option>
+          <option value="none">No assessment</option>
+          <option value="draft">Draft</option>
+          <option value="in_progress">In progress</option>
+          <option value="submitted">Submitted</option>
+          <option value="approved">Approved</option>
+        </select>
+
+        <button
+          type="button"
+          onClick={resetFilters}
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Reset filters
+        </button>
       </div>
 
       {isLoading ? (
@@ -195,28 +338,56 @@ export function SystemsPage() {
                     {sys.riskTier}
                   </span>
                 </div>
+                {(sys.businessUnitName || sys.department) && (
+                  <p className="mt-1 text-xs font-medium text-teal-700 dark:text-teal-400">
+                    {[sys.businessUnitName, sys.department].filter(Boolean).join(' / ')}
+                  </p>
+                )}
                 <p className="mt-2 line-clamp-2 text-xs text-slate-600 dark:text-slate-400">
                   {sys.description}
                 </p>
               </div>
-              <div className="mt-4 flex flex-wrap gap-1.5 text-xs">
-                <span className="rounded bg-teal-50 px-2 py-0.5 text-teal-800 capitalize dark:bg-teal-950/60 dark:text-teal-300">
-                  {sys.lifecycleStage}
-                </span>
-                <span className="rounded bg-slate-100 px-2 py-0.5 capitalize dark:bg-slate-800">
-                  {sys.deploymentType.replace('_', ' ')}
-                </span>
-                {sys.aaefReference && (
-                  <span className="rounded bg-indigo-50 px-2 py-0.5 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300">
-                    {sys.aaefReference}
+
+              <div className="mt-4 space-y-3">
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>
+                      Assessment: <strong className="capitalize">{sys.latestAssessmentStatus.replace('_', ' ')}</strong>
+                    </span>
+                    <span>
+                      {sys.latestOverallScore !== null
+                        ? `Score ${sys.latestOverallScore.toFixed(2)}/4 | `
+                        : ''}
+                      {sys.completenessPercent}% complete
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className="h-full rounded-full bg-teal-600"
+                      style={{ width: `${sys.completenessPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 text-xs">
+                  <span className="rounded bg-teal-50 px-2 py-0.5 text-teal-800 capitalize dark:bg-teal-950/60 dark:text-teal-300">
+                    {sys.lifecycleStage}
                   </span>
-                )}
+                  <span className="rounded bg-slate-100 px-2 py-0.5 capitalize dark:bg-slate-800">
+                    {sys.deploymentType.replace('_', ' ')}
+                  </span>
+                  {sys.aaefReference && (
+                    <span className="rounded bg-indigo-50 px-2 py-0.5 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300">
+                      {sys.aaefReference}
+                    </span>
+                  )}
+                </div>
               </div>
             </Link>
           ))}
           {(data?.aiSystems ?? []).length === 0 && (
             <div className="col-span-full rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 dark:border-slate-700">
-              No AI systems registered yet.
+              No AI systems match the current filters.
             </div>
           )}
         </div>
@@ -228,30 +399,63 @@ export function SystemsPage() {
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
             <h2 className="text-lg font-bold">Register AI System</h2>
             <form onSubmit={handleCreate} className="mt-4 space-y-3">
-              <div>
-                <label className="block text-sm font-medium">Organisation</label>
-                <select
-                  value={form.organisationId || orgData?.organisations[0]?.id || ''}
-                  onChange={(e) => setForm({ ...form, organisationId: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
-                >
-                  {(orgData?.organisations ?? []).map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium">Organisation</label>
+                  <select
+                    value={selectedOrgId}
+                    onChange={(e) =>
+                      setForm({ ...form, organisationId: e.target.value, businessUnitId: '' })
+                    }
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    {(orgData?.organisations ?? []).map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Business Unit</label>
+                  <select
+                    value={form.businessUnitId}
+                    onChange={(e) => setForm({ ...form, businessUnitId: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <option value="">Not assigned</option>
+                    {availableBus.map((bu) => (
+                      <option key={bu.id} value={bu.id}>
+                        {bu.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium">System Name</label>
-                <input
-                  type="text"
-                  required
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
-                />
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium">System Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Department</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Customer Operations"
+                    value={form.department}
+                    onChange={(e) => setForm({ ...form, department: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                </div>
               </div>
+
               <div>
                 <label className="block text-sm font-medium">Description</label>
                 <textarea
@@ -262,6 +466,7 @@ export function SystemsPage() {
                   className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium">Lifecycle Stage</label>

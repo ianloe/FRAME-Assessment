@@ -218,6 +218,7 @@ export const aiSystems = pgTable(
     businessUnitId: uuid('business_unit_id').references(() => businessUnits.id, {
       onDelete: 'set null'
     }),
+    department: text('department').notNull().default(''),
     ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'set null' }),
     name: text('name').notNull(),
     description: text('description').notNull(),

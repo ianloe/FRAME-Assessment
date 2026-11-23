@@ -8,6 +8,13 @@
       "when": 1795422302020,
       "tag": "0000_optimal_the_hand",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795435039579,
+      "tag": "0001_old_red_wolf",
+      "breakpoints": true
     }
   ]
 }

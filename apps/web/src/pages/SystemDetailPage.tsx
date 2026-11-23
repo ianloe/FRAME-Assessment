@@ -9,6 +9,11 @@ import { formatDate } from '../lib/date';
 interface SystemDetailData {
   aiSystem: {
     id: string;
+    organisationId: string;
+    organisationName: string;
+    businessUnitId: string | null;
+    businessUnitName: string;
+    department: string;
     name: string;
     description: string;
     lifecycleStage: string;
@@ -73,6 +78,18 @@ export function SystemDetailPage() {
   const [checklistSection, setChecklistSection] = useState<
     'pre_deployment' | 'operational_30d' | 'operational_90d' | 'quarterly'
   >('pre_deployment');
+  const [showEditSys, setShowEditSys] = useState(false);
+  const [editBuId, setEditBuId] = useState('');
+  const [editDept, setEditDept] = useState('');
+  const [editRisk, setEditRisk] = useState('');
+  const [editStage, setEditStage] = useState('');
+
+  const { data: orgData } = useQuery<{
+    businessUnits: Array<{ id: string; organisationId: string; name: string }>;
+  }>({
+    queryKey: ['organisations'],
+    queryFn: () => apiFetch('/api/organisations')
+  });
 
   const { data, isLoading, refetch } = useQuery<SystemDetailData>({
     queryKey: ['ai-system', id],
@@ -166,20 +183,46 @@ export function SystemDetailPage() {
             Export System PDF (A4)
           </button>
           {canEdit && (
-            <button
-              type="button"
-              onClick={() => setShowNewAssessment(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
-            >
-              <Plus className="h-4 w-4" />
-              New Assessment
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditBuId(sys.businessUnitId ?? '');
+                  setEditDept(sys.department ?? '');
+                  setEditRisk(sys.riskTier);
+                  setEditStage(sys.lifecycleStage);
+                  setShowEditSys(true);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
+              >
+                Edit Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNewAssessment(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+              >
+                <Plus className="h-4 w-4" />
+                New Assessment
+              </button>
+            </>
           )}
         </div>
       </div>
 
       {/* Metadata & AAEF */}
-      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm sm:grid-cols-2 lg:grid-cols-4 dark:border-slate-800 dark:bg-slate-900">
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 text-sm sm:grid-cols-2 lg:grid-cols-3 dark:border-slate-800 dark:bg-slate-900">
+        <div>
+          <span className="text-xs text-slate-500">Organisation & Business Unit</span>
+          <p className="font-medium">
+            {sys.organisationName}
+            {sys.businessUnitName ? ` / ${sys.businessUnitName}` : ''}
+          </p>
+        </div>
+        <div>
+          <span className="text-xs text-slate-500">Department</span>
+          <p className="font-medium">{sys.department || 'Not specified'}</p>
+        </div>
         <div>
           <span className="text-xs text-slate-500">Lifecycle Stage</span>
           <p className="font-medium capitalize">{sys.lifecycleStage}</p>
@@ -333,6 +376,103 @@ export function SystemDetailPage() {
           )}
         </div>
       </section>
+
+      {/* Edit System Profile Modal */}
+      {showEditSys && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <h2 className="text-lg font-bold">Edit AI System Profile</h2>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                await apiFetch(`/api/ai-systems/${sys.id}`, {
+                  method: 'PUT',
+                  body: JSON.stringify({
+                    businessUnitId: editBuId || null,
+                    department: editDept,
+                    riskTier: editRisk,
+                    lifecycleStage: editStage
+                  })
+                });
+                setShowEditSys(false);
+                await refetch();
+              }}
+              className="mt-4 space-y-3"
+            >
+              <div>
+                <label className="block text-sm font-medium">Business Unit</label>
+                <select
+                  value={editBuId}
+                  onChange={(e) => setEditBuId(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <option value="">Not assigned</option>
+                  {(orgData?.businessUnits ?? [])
+                    .filter((b) => b.organisationId === sys.organisationId)
+                    .map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Department</label>
+                <input
+                  type="text"
+                  value={editDept}
+                  onChange={(e) => setEditDept(e.target.value)}
+                  placeholder="e.g. Customer Operations"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium">Risk Tier</label>
+                  <select
+                    value={editRisk}
+                    onChange={(e) => setEditRisk(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Lifecycle Stage</label>
+                  <select
+                    value={editStage}
+                    onChange={(e) => setEditStage(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <option value="idea">Idea</option>
+                    <option value="pilot">Pilot</option>
+                    <option value="production">Production</option>
+                    <option value="retired">Retired</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditSys(false)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm dark:border-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* New Assessment Modal */}
       {showNewAssessment && (

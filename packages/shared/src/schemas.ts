@@ -80,6 +80,7 @@ export const LoginPasswordSchema = z.object({
 export const CreateAISystemSchema = z.object({
   organisationId: z.string().uuid(),
   businessUnitId: z.string().uuid().nullable().optional(),
+  department: z.string().trim().max(120).default(''),
   ownerId: z.string().uuid().nullable().optional(),
   name: z.string().trim().min(2).max(160),
   description: z.string().trim().min(1).max(4000),

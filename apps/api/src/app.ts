@@ -15,6 +15,7 @@ import { systemRoutes } from './routes/systems.js';
 import { assessmentRoutes } from './routes/assessments.js';
 import { governanceRoutes } from './routes/governance.js';
 import { reportRoutes } from './routes/reports.js';
+import { aiInsightsRoutes } from './routes/aiInsights.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -114,6 +115,7 @@ export async function buildApp() {
   await app.register(assessmentRoutes);
   await app.register(governanceRoutes);
   await app.register(reportRoutes);
+  await app.register(aiInsightsRoutes);
 
   return app;
 }

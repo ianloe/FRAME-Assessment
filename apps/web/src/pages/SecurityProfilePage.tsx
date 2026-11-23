@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { startRegistration } from '@simplewebauthn/browser';
-import { KeyRound, Trash2, RefreshCw } from 'lucide-react';
+import { KeyRound, Trash2, RefreshCw, Smartphone, Sparkles } from 'lucide-react';
 import { apiFetch, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { formatDateTime } from '../lib/date';
@@ -25,14 +25,35 @@ interface SessionItem {
   isCurrent: boolean;
 }
 
+const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
+  openrouter: 'openai/gpt-4o-mini',
+  gemini: 'gemini-2.5-flash',
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-3-5-sonnet-latest',
+  'agnes-ai': 'agnes-default',
+  deepseek: 'deepseek-chat',
+  custom: 'local-model'
+};
+
 export function SecurityProfilePage() {
-  const { openStepUp, refetchSession } = useAuth();
+  const { session, openStepUp, refetchSession } = useAuth();
   const [passkeyName, setPasskeyName] = useState('My Security Key');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [newRecoveryCodes, setNewRecoveryCodes] = useState<string[] | null>(null);
+
+  // TOTP Enrolment state
+  const [totpSetup, setTotpSetup] = useState<{ manualKey: string; qrDataUrl: string } | null>(null);
+  const [totpCode, setTotpCode] = useState('');
+
+  // Personal AI Insights LLM override state
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiProvider, setAiProvider] = useState('openrouter');
+  const [aiModel, setAiModel] = useState('openai/gpt-4o-mini');
+  const [aiBaseUrl, setAiBaseUrl] = useState('');
+  const [aiApiKey, setAiApiKey] = useState('');
 
   const { data: passkeysData, refetch: refetchPasskeys } = useQuery<{ passkeys: PasskeyItem[] }>({
     queryKey: ['my-passkeys'],
@@ -43,6 +64,31 @@ export function SecurityProfilePage() {
     queryKey: ['my-sessions'],
     queryFn: () => apiFetch('/api/auth/sessions')
   });
+
+  const { data: aiCfgData, refetch: refetchAiCfg } = useQuery<{
+    globalEnabled: boolean;
+    allowUserOverride: boolean;
+    userConfig: {
+      enabled: boolean;
+      provider: string;
+      model: string;
+      baseUrl: string;
+      hasApiKey: boolean;
+      keyHint: string;
+    };
+  }>({
+    queryKey: ['user-ai-config'],
+    queryFn: () => apiFetch('/api/ai-insights/config')
+  });
+
+  useEffect(() => {
+    if (aiCfgData?.userConfig) {
+      setAiEnabled(aiCfgData.userConfig.enabled);
+      setAiProvider(aiCfgData.userConfig.provider);
+      setAiModel(aiCfgData.userConfig.model);
+      setAiBaseUrl(aiCfgData.userConfig.baseUrl);
+    }
+  }, [aiCfgData]);
 
   const addPasskey = async () => {
     setError('');
@@ -73,6 +119,38 @@ export function SecurityProfilePage() {
       } else {
         setError((err as Error).message);
       }
+    }
+  };
+
+  const startTotpSetup = async () => {
+    setError('');
+    setMessage('');
+    try {
+      const res = await apiFetch<{ manualKey: string; qrDataUrl: string }>(
+        '/api/auth/mfa/totp/setup',
+        { method: 'POST' }
+      );
+      setTotpSetup(res);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const verifyTotpSetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const res = await apiFetch<{ recoveryCodes: string[] }>('/api/auth/mfa/totp/verify-setup', {
+        method: 'POST',
+        body: JSON.stringify({ code: totpCode })
+      });
+      setTotpSetup(null);
+      setTotpCode('');
+      setNewRecoveryCodes(res.recoveryCodes);
+      setMessage('Authenticator App (TOTP) enrolled. Please save your recovery codes below.');
+      await refetchSession();
+    } catch (err) {
+      setError((err as Error).message);
     }
   };
 
@@ -109,12 +187,36 @@ export function SecurityProfilePage() {
     }
   };
 
+  const savePersonalAiConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    try {
+      await apiFetch('/api/ai-insights/user-config', {
+        method: 'PUT',
+        body: JSON.stringify({
+          enabled: aiEnabled,
+          provider: aiProvider,
+          model: aiModel,
+          baseUrl: aiBaseUrl,
+          apiKey: aiApiKey || undefined
+        })
+      });
+      setAiApiKey('');
+      setMessage('Personal AI Insights LLM configuration saved.');
+      await refetchAiCfg();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">My Security & Sessions</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Manage your passkeys, recovery codes, password, and active sessions.
+          Manage your passkeys, authenticator app (TOTP), recovery codes, password, sessions, and
+          personal LLM configuration.
         </p>
       </div>
 
@@ -178,6 +280,70 @@ export function SecurityProfilePage() {
         </ul>
       </section>
 
+      {/* Authenticator App (TOTP) */}
+      <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              <Smartphone className="h-5 w-5 text-teal-700" />
+              Authenticator App (TOTP)
+            </h2>
+            <p className="text-xs text-slate-500">
+              Status:{' '}
+              <strong className={session?.hasTotpEnrolled ? 'text-teal-700 dark:text-teal-400' : ''}>
+                {session?.hasTotpEnrolled ? 'Enrolled' : 'Not enrolled'}
+              </strong>{' '}
+              (You can use both Passkeys and an Authenticator App.)
+            </p>
+          </div>
+          {!totpSetup && (
+            <button
+              type="button"
+              onClick={startTotpSetup}
+              className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+            >
+              {session?.hasTotpEnrolled ? 'Reconfigure TOTP' : 'Enrol Authenticator App'}
+            </button>
+          )}
+        </div>
+
+        {totpSetup && (
+          <form onSubmit={verifyTotpSetup} className="mt-4 space-y-3">
+            <div className="flex flex-col items-center gap-2 rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
+              <img src={totpSetup.qrDataUrl} alt="TOTP QR code" className="h-40 w-40 rounded bg-white p-1" />
+              <p className="text-xs text-slate-500">
+                Manual key: <code className="font-mono font-semibold">{totpSetup.manualKey}</code>
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                required
+                inputMode="numeric"
+                pattern="\d{6}"
+                placeholder="Enter 6-digit code"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+              >
+                Verify & Activate
+              </button>
+              <button
+                type="button"
+                onClick={() => setTotpSetup(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm dark:border-slate-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
+
       {/* Recovery Codes */}
       <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between">
@@ -204,6 +370,90 @@ export function SecurityProfilePage() {
           </div>
         )}
       </section>
+
+      {/* Personal AI Insights LLM Configuration (when allowed by Admin) */}
+      {(aiCfgData?.allowUserOverride || session?.user.role === 'admin') && (
+        <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <Sparkles className="h-5 w-5 text-teal-700" />
+            My AI Insights LLM Configuration
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Configure your personal LLM provider (OpenRouter, Gemini, OpenAI, Anthropic, Agnes-AI,
+            DeepSeek, or a custom OpenAI-compatible endpoint). API keys are encrypted at rest.
+          </p>
+          <form onSubmit={savePersonalAiConfig} className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={aiEnabled}
+                onChange={(e) => setAiEnabled(e.target.checked)}
+              />
+              Use my personal LLM configuration for AI Insights
+            </label>
+            <div>
+              <label className="block text-xs font-medium">Provider</label>
+              <select
+                value={aiProvider}
+                onChange={(e) => {
+                  const p = e.target.value;
+                  setAiProvider(p);
+                  setAiModel(PROVIDER_DEFAULT_MODELS[p] ?? '');
+                }}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              >
+                <option value="openrouter">OpenRouter</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="agnes-ai">Agnes-AI</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="custom">Custom OpenAI-Compatible LLM</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium">Model</label>
+              <input
+                type="text"
+                required
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium">Custom Base URL (optional / for custom)</label>
+              <input
+                type="url"
+                placeholder="https://..."
+                value={aiBaseUrl}
+                onChange={(e) => setAiBaseUrl(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium">
+                API Key {aiCfgData?.userConfig.hasApiKey ? `(saved: ${aiCfgData.userConfig.keyHint})` : ''}
+              </label>
+              <input
+                type="password"
+                placeholder={aiCfgData?.userConfig.hasApiKey ? 'Leave blank to keep existing key' : 'Enter API key'}
+                value={aiApiKey}
+                onChange={(e) => setAiApiKey(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <button
+                type="submit"
+                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+              >
+                Save Personal LLM Settings
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
 
       {/* Change Password */}
       <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ShieldCheck, UserPlus, Building2, FileText, Lock, Activity } from 'lucide-react';
+import { ShieldCheck, UserPlus, Building2, FileText, Lock, Activity, Sparkles } from 'lucide-react';
 import { apiFetch, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { formatDateTime } from '../lib/date';
@@ -8,8 +8,18 @@ import type { PermissionRule, Role } from '@frame/shared';
 
 export function AdminPage() {
   const { openStepUp } = useAuth();
-  const [tab, setTab] = useState<'users' | 'orgs' | 'matrix' | 'questionnaires' | 'security' | 'health'>('users');
+  const [tab, setTab] = useState<
+    'users' | 'orgs' | 'matrix' | 'questionnaires' | 'security' | 'ai_insights' | 'health'
+  >('users');
   const [viewAsRole, setViewAsRole] = useState<Role>('admin');
+
+  // AI Insights Admin state
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiAllowOverride, setAiAllowOverride] = useState(true);
+  const [aiProvider, setAiProvider] = useState('openrouter');
+  const [aiModel, setAiModel] = useState('openai/gpt-4o-mini');
+  const [aiBaseUrl, setAiBaseUrl] = useState('');
+  const [aiApiKey, setAiApiKey] = useState('');
 
   // Direct user creation form (initial password, no email sent)
   const [directName, setDirectName] = useState('');
@@ -116,6 +126,30 @@ export function AdminPage() {
     queryFn: () => apiFetch('/api/admin/health'),
     enabled: tab === 'health'
   });
+
+  const { data: adminAiData, refetch: refetchAdminAi } = useQuery<{
+    enabled: boolean;
+    allowUserOverride: boolean;
+    provider: string;
+    model: string;
+    baseUrl: string;
+    hasApiKey: boolean;
+    keyHint: string;
+  }>({
+    queryKey: ['admin-ai-insights'],
+    queryFn: () => apiFetch('/api/admin/ai-insights'),
+    enabled: tab === 'ai_insights'
+  });
+
+  useEffect(() => {
+    if (adminAiData) {
+      setAiEnabled(adminAiData.enabled);
+      setAiAllowOverride(adminAiData.allowUserOverride);
+      setAiProvider(adminAiData.provider);
+      setAiModel(adminAiData.model);
+      setAiBaseUrl(adminAiData.baseUrl);
+    }
+  }, [adminAiData]);
 
   const [verifyChainResult, setVerifyChainResult] = useState<{
     valid: boolean;
@@ -259,6 +293,7 @@ export function AdminPage() {
     { id: 'matrix', label: 'View as Role Matrix', icon: ShieldCheck },
     { id: 'questionnaires', label: 'Questionnaires', icon: FileText },
     { id: 'security', label: 'Security Policy', icon: Lock },
+    { id: 'ai_insights', label: 'AI Insights', icon: Sparkles },
     { id: 'health', label: 'Health & Integrity', icon: Activity }
   ] as const;
 
@@ -762,6 +797,135 @@ export function AdminPage() {
           >
             Toggle Passkey Required for Admins
           </button>
+        </section>
+      )}
+
+      {tab === 'ai_insights' && (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <Sparkles className="h-5 w-5 text-teal-700" />
+            AI Insights Configuration
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Configure the default LLM provider for generating FRAME governance insights across AI
+            systems. API keys are encrypted at rest with AES-256-GCM.
+          </p>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setError('');
+              setMessage('');
+              try {
+                await apiFetch('/api/admin/ai-insights', {
+                  method: 'PUT',
+                  body: JSON.stringify({
+                    enabled: aiEnabled,
+                    allowUserOverride: aiAllowOverride,
+                    provider: aiProvider,
+                    model: aiModel,
+                    baseUrl: aiBaseUrl,
+                    apiKey: aiApiKey || undefined
+                  })
+                });
+                setAiApiKey('');
+                setMessage('AI Insights configuration saved.');
+                await refetchAdminAi();
+              } catch (err) {
+                if (err instanceof ApiError && err.code === 'STEP_UP_REQUIRED') {
+                  openStepUp();
+                } else {
+                  setError((err as Error).message);
+                }
+              }
+            }}
+            className="mt-4 grid gap-4 sm:grid-cols-2"
+          >
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={aiEnabled}
+                onChange={(e) => setAiEnabled(e.target.checked)}
+              />
+              Enable AI Insights globally
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={aiAllowOverride}
+                onChange={(e) => setAiAllowOverride(e.target.checked)}
+              />
+              Allow users to configure their own LLM provider/key in My Security
+            </label>
+            <div>
+              <label className="block text-xs font-medium">LLM Provider</label>
+              <select
+                value={aiProvider}
+                onChange={(e) => {
+                  const p = e.target.value;
+                  setAiProvider(p);
+                  const defaults: Record<string, string> = {
+                    openrouter: 'openai/gpt-4o-mini',
+                    gemini: 'gemini-2.5-flash',
+                    openai: 'gpt-4o-mini',
+                    anthropic: 'claude-3-5-sonnet-latest',
+                    'agnes-ai': 'agnes-default',
+                    deepseek: 'deepseek-chat',
+                    custom: 'local-model'
+                  };
+                  setAiModel(defaults[p] ?? '');
+                }}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              >
+                <option value="openrouter">OpenRouter</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="agnes-ai">Agnes-AI</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="custom">Custom OpenAI-Compatible LLM</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium">Model Identifier</label>
+              <input
+                type="text"
+                required
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium">Base URL (optional / required for custom)</label>
+              <input
+                type="url"
+                placeholder="https://..."
+                value={aiBaseUrl}
+                onChange={(e) => setAiBaseUrl(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium">
+                API Key {adminAiData?.hasApiKey ? `(saved: ${adminAiData.keyHint})` : ''}
+              </label>
+              <input
+                type="password"
+                placeholder={adminAiData?.hasApiKey ? 'Leave blank to keep existing key' : 'Enter API key'}
+                value={aiApiKey}
+                onChange={(e) => setAiApiKey(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <button
+                type="submit"
+                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+              >
+                Save AI Insights Configuration
+              </button>
+            </div>
+          </form>
         </section>
       )}
 

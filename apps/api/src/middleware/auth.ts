@@ -19,6 +19,7 @@ export interface AuthContext {
   sessionId: string;
   csrfSecret: string;
   mfaVerified: boolean;
+  hasTotpEnrolled: boolean;
   hasMfaEnrolled: boolean;
   hasPasskeyEnrolled: boolean;
   stepUpVerifiedAt: Date | null;
@@ -191,7 +192,8 @@ export async function authenticateRequest(request: FastifyRequest, reply: Fastif
     );
 
   const hasPasskeyEnrolled = passkeys.length > 0;
-  const hasMfaEnrolled = Boolean(totp?.verified) || hasPasskeyEnrolled;
+  const hasTotpEnrolled = Boolean(totp?.verified);
+  const hasMfaEnrolled = hasTotpEnrolled || hasPasskeyEnrolled;
   const scopes = await getUserScopes(user.id);
 
   request.auth = {
@@ -204,6 +206,7 @@ export async function authenticateRequest(request: FastifyRequest, reply: Fastif
     sessionId: session.id,
     csrfSecret: session.csrfSecret,
     mfaVerified: session.mfaVerified,
+    hasTotpEnrolled,
     hasMfaEnrolled,
     hasPasskeyEnrolled,
     stepUpVerifiedAt: session.stepUpVerifiedAt,

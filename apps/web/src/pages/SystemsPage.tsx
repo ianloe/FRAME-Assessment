@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Plus, Download, Upload, Search, RotateCcw } from 'lucide-react';
+import { Plus, Download, Upload, Search, RotateCcw, Sparkles } from 'lucide-react';
 import { apiFetch, ApiError, downloadFile } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
@@ -40,6 +40,13 @@ export function SystemsPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiResult, setAiResult] = useState<{ provider: string; model: string; insights: string } | null>(
+    null
+  );
+  const [aiErr, setAiErr] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
   const [csvText, setCsvText] = useState(
     'name,description,department,lifecycleStage,deploymentType,riskTier,targetMaturityLevel,aaefReference\n'
   );
@@ -192,6 +199,18 @@ export function SystemsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setAiErr('');
+              setShowAiModal(true);
+            }}
+            disabled={(data?.aiSystems ?? []).length === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-teal-600 bg-teal-50 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-100 disabled:opacity-50 dark:bg-teal-950/40 dark:text-teal-300"
+          >
+            <Sparkles className="h-4 w-4" />
+            AI Insights ({(data?.aiSystems ?? []).length})
+          </button>
           <button
             type="button"
             onClick={handleExportCsv}
@@ -549,6 +568,77 @@ export function SystemsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-system AI Insights Modal */}
+      {showAiModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-lg font-bold">
+                <Sparkles className="h-5 w-5 text-teal-700" />
+                Portfolio AI Governance Insights
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowAiModal(false)}
+                className="rounded border border-slate-300 px-3 py-1 text-xs dark:border-slate-700"
+              >
+                Close
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              Analyses up to 15 systems from your current filtered view ({Math.min(15, (data?.aiSystems ?? []).length)} selected).
+            </p>
+            <div className="mt-3 flex gap-2">
+              <input
+                type="text"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="Optional focus (e.g. Compare high-risk systems and top remediation priorities)..."
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+              <button
+                type="button"
+                disabled={aiBusy}
+                onClick={async () => {
+                  setAiErr('');
+                  setAiBusy(true);
+                  try {
+                    const ids = (data?.aiSystems ?? []).slice(0, 15).map((s) => s.id);
+                    const res = await apiFetch<{
+                      provider: string;
+                      model: string;
+                      insights: string;
+                    }>('/api/ai-insights/generate', {
+                      method: 'POST',
+                      body: JSON.stringify({ aiSystemIds: ids, focusPrompt: aiPrompt || undefined })
+                    });
+                    setAiResult(res);
+                  } catch (err) {
+                    setAiErr((err as Error).message);
+                  } finally {
+                    setAiBusy(false);
+                  }
+                }}
+                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+              >
+                {aiBusy ? 'Generating...' : 'Generate'}
+              </button>
+            </div>
+            {aiErr && <p className="mt-3 text-xs text-red-600">{aiErr}</p>}
+            {aiResult && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
+                <p className="mb-2 text-xs text-slate-500">
+                  Generated by {aiResult.provider} ({aiResult.model})
+                </p>
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                  {aiResult.insights}
+                </pre>
+              </div>
+            )}
           </div>
         </div>
       )}

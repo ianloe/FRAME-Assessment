@@ -93,6 +93,7 @@ export async function authRoutes(app: FastifyInstance) {
       },
       csrfToken: auth.csrfSecret,
       mfaVerified: auth.mfaVerified,
+      hasTotpEnrolled: auth.hasTotpEnrolled,
       hasMfaEnrolled: auth.hasMfaEnrolled,
       hasPasskeyEnrolled: auth.hasPasskeyEnrolled,
       mfaMandatory,

@@ -14,6 +14,7 @@ export interface AuthSession {
   };
   csrfToken: string;
   mfaVerified: boolean;
+  hasTotpEnrolled: boolean;
   hasMfaEnrolled: boolean;
   hasPasskeyEnrolled: boolean;
   mfaMandatory: boolean;

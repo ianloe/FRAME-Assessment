@@ -32,12 +32,20 @@ declare module 'fastify' {
   }
 }
 
+function isHttpsRequest(request?: FastifyRequest): boolean {
+  if (!request) return config.appBaseUrl.startsWith('https://');
+  const xfProto = request.headers['x-forwarded-proto'];
+  if (typeof xfProto === 'string' && xfProto.split(',')[0].trim() === 'https') return true;
+  return request.protocol === 'https';
+}
+
 export async function createSession(params: {
   userId: string;
   mfaVerified: boolean;
   authMethod: 'password' | 'passkey';
   ipAddress: string;
   userAgent: string;
+  request?: FastifyRequest;
   reply: FastifyReply;
 }) {
   const policy = await getSetting<SecurityPolicy>('security_policy', DEFAULT_SECURITY_POLICY);
@@ -67,7 +75,7 @@ export async function createSession(params: {
   params.reply.setCookie(SESSION_COOKIE_NAME, rawToken, {
     httpOnly: true,
     sameSite: 'strict',
-    secure: config.nodeEnv === 'production' && config.appBaseUrl.startsWith('https://'),
+    secure: isHttpsRequest(params.request),
     path: '/',
     maxAge: policy.absoluteTimeoutHours * 3600
   });
@@ -114,7 +122,7 @@ export async function rotateSession(
   reply.setCookie(SESSION_COOKIE_NAME, rawToken, {
     httpOnly: true,
     sameSite: 'strict',
-    secure: config.nodeEnv === 'production' && config.appBaseUrl.startsWith('https://'),
+    secure: isHttpsRequest(request),
     path: '/',
     maxAge: policy.absoluteTimeoutHours * 3600
   });

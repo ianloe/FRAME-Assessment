@@ -34,14 +34,14 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 3001
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8088}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8088}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://frame.ianloehome.net,http://localhost:8088}
       DATABASE_URL: postgresql://${POSTGRES_USER:-frame}:${POSTGRES_PASSWORD:-frame_dev_password}@db:5432/${POSTGRES_DB:-frame_db}
       SESSION_SECRET: ${SESSION_SECRET:-change-me-session-secret-at-least-32-chars-long}
       TOTP_ENCRYPTION_KEYS: ${TOTP_ENCRYPTION_KEYS:-v1:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
       TOTP_ACTIVE_KEY_VERSION: ${TOTP_ACTIVE_KEY_VERSION:-v1}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-FRAME Assessment Platform}
-      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
-      WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:8088}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-auto}
+      WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-https://frame.ianloehome.net,http://localhost:8088}
       ADMIN_NAME: ${ADMIN_NAME:-Platform Administrator}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@frame.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}

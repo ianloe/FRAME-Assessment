@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import * as OTPAuth from 'otpauth';
@@ -36,6 +36,45 @@ import {
   requireStepUp,
   rotateSession
 } from '../middleware/auth.js';
+
+function getWebAuthnContext(request: FastifyRequest): { rpID: string; expectedOrigin: string } {
+  const configuredOrigins = config.webauthnOrigin
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  const reqOrigin = typeof request.headers.origin === 'string' ? request.headers.origin : '';
+  const xfHost =
+    typeof request.headers['x-forwarded-host'] === 'string'
+      ? request.headers['x-forwarded-host'].split(',')[0].trim()
+      : '';
+  const hostHeader = xfHost || (typeof request.headers.host === 'string' ? request.headers.host : '');
+  const reqHostname = hostHeader.split(':')[0];
+
+  if (config.webauthnRpId === 'auto' && reqOrigin) {
+    try {
+      const parsed = new URL(reqOrigin);
+      if (!reqHostname || parsed.hostname === reqHostname) {
+        return { rpID: parsed.hostname, expectedOrigin: reqOrigin };
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  if (reqOrigin && configuredOrigins.includes(reqOrigin)) {
+    const parsed = new URL(reqOrigin);
+    return {
+      rpID: config.webauthnRpId === 'auto' ? parsed.hostname : config.webauthnRpId,
+      expectedOrigin: reqOrigin
+    };
+  }
+
+  return {
+    rpID: config.webauthnRpId === 'auto' ? reqHostname || 'localhost' : config.webauthnRpId,
+    expectedOrigin: configuredOrigins[0] ?? config.webauthnOrigin
+  };
+}
 
 async function recordAuthEvent(params: {
   userId?: string | null;
@@ -765,6 +804,7 @@ export async function authRoutes(app: FastifyInstance) {
   // --- Passkeys (WebAuthn / FIDO2) ---
   app.post('/api/auth/passkey/register/options', { preHandler: authenticateRequest }, async (request) => {
     const auth = request.auth!;
+    const { rpID } = getWebAuthnContext(request);
     const existing = await db
       .select()
       .from(schema.webauthnCredentials)
@@ -774,7 +814,7 @@ export async function authRoutes(app: FastifyInstance) {
 
     const options = await generateRegistrationOptions({
       rpName: config.webauthnRpName,
-      rpID: config.webauthnRpId,
+      rpID,
       userName: auth.email,
       userDisplayName: auth.name,
       userID: new TextEncoder().encode(auth.userId),
@@ -825,13 +865,21 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Passkey registration challenge expired' });
     }
 
-    const verification = await verifyRegistrationResponse({
-      response: body.response,
-      expectedChallenge: challengeRow.challenge,
-      expectedOrigin: config.webauthnOrigin,
-      expectedRPID: config.webauthnRpId,
-      requireUserVerification: true
-    });
+    const { rpID, expectedOrigin } = getWebAuthnContext(request);
+    let verification;
+    try {
+      verification = await verifyRegistrationResponse({
+        response: body.response,
+        expectedChallenge: challengeRow.challenge,
+        expectedOrigin,
+        expectedRPID: rpID,
+        requireUserVerification: true
+      });
+    } catch (err) {
+      return reply.code(400).send({
+        error: `Passkey registration failed: ${(err as Error).message}`
+      });
+    }
 
     if (!verification.verified || !verification.registrationInfo) {
       return reply.code(400).send({ error: 'Passkey registration verification failed' });
@@ -872,9 +920,10 @@ export async function authRoutes(app: FastifyInstance) {
   app.post(
     '/api/auth/passkey/login/options',
     { config: { rateLimit: { max: 20, timeWindow: '5 minutes' } } },
-    async () => {
+    async (request) => {
+      const { rpID } = getWebAuthnContext(request);
       const options = await generateAuthenticationOptions({
-        rpID: config.webauthnRpId,
+        rpID,
         userVerification: 'required'
       });
 
@@ -939,19 +988,36 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.code(401).send({ error: 'Account unavailable' });
       }
 
-      const verification = await verifyAuthenticationResponse({
-        response: body.response,
-        expectedChallenge: challengeRow.challenge,
-        expectedOrigin: config.webauthnOrigin,
-        expectedRPID: config.webauthnRpId,
-        requireUserVerification: true,
-        credential: {
-          id: cred.credentialId,
-          publicKey: new Uint8Array(Buffer.from(cred.publicKey, 'base64url')),
-          counter: cred.counter,
-          transports: cred.transports as AuthenticatorTransport[]
-        }
-      });
+      const { rpID, expectedOrigin } = getWebAuthnContext(request);
+      let verification;
+      try {
+        verification = await verifyAuthenticationResponse({
+          response: body.response,
+          expectedChallenge: challengeRow.challenge,
+          expectedOrigin,
+          expectedRPID: rpID,
+          requireUserVerification: true,
+          credential: {
+            id: cred.credentialId,
+            publicKey: new Uint8Array(Buffer.from(cred.publicKey, 'base64url')),
+            counter: cred.counter,
+            transports: cred.transports as AuthenticatorTransport[]
+          }
+        });
+      } catch (err) {
+        await recordAuthEvent({
+          userId: user.id,
+          email: user.email,
+          eventType: 'login_passkey',
+          success: false,
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'] ?? '',
+          metadata: { reason: (err as Error).message }
+        });
+        return reply.code(400).send({
+          error: `Passkey verification failed: ${(err as Error).message}`
+        });
+      }
 
       if (!verification.verified) {
         await recordAuthEvent({

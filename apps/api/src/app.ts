@@ -40,8 +40,13 @@ export async function buildApp() {
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
   });
 
+  const allowedCorsOrigins = config.corsOrigin
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   await app.register(cors, {
-    origin: config.corsOrigin,
+    origin: allowedCorsOrigins.length === 1 ? allowedCorsOrigins[0] : allowedCorsOrigins,
     credentials: true
   });
 

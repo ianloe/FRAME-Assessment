@@ -16,6 +16,7 @@ import { ActionsPage } from './pages/ActionsPage';
 import { AuditorWorkspacePage } from './pages/AuditorWorkspacePage';
 import { AdminPage } from './pages/AdminPage';
 import { SecurityProfilePage } from './pages/SecurityProfilePage';
+import { UserManualPage } from './pages/UserManualPage';
 
 const queryClient = new QueryClient();
 
@@ -131,6 +132,14 @@ export function App() {
               element={
                 <ProtectedRoute>
                   <SecurityProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manual"
+              element={
+                <ProtectedRoute>
+                  <UserManualPage />
                 </ProtectedRoute>
               }
             />

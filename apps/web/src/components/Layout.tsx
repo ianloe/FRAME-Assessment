@@ -13,6 +13,7 @@ import {
   Moon,
   Bell,
   UserCheck,
+  BookOpen,
   Menu,
   X
 } from 'lucide-react';
@@ -59,7 +60,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       icon: Settings,
       show: session?.user.role === 'admin'
     },
-    { to: '/security', label: 'My Security', icon: UserCheck, show: true }
+    { to: '/security', label: 'My Security', icon: UserCheck, show: true },
+    { to: '/manual', label: 'User Manual', icon: BookOpen, show: true }
   ].filter((item) => item.show);
 
   const handleLogout = async () => {

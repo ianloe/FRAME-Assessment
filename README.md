@@ -39,6 +39,14 @@ A production-quality, multi-user enterprise AI governance assessment, review, an
 4. Optional Demo Dataset:
    Set `SEED_DEMO=true` in `.env` (or pass `SEED_DEMO=true docker compose up --build`) to seed a demo organisation, three AI systems, sample assessments, actions, and demo accounts (`user@frame.local`, `reviewer@frame.local`, `auditor@frame.local` with password `DemoFrame2026!ChangeMe`, forced to change on login).
 
+## Email & MailHog (Local Development)
+
+`docker-compose.yml` includes **MailHog**, a local SMTP testing server:
+- **Purpose**: Captures all outgoing emails sent by the `api` service (user invitation links, password resets, and governance notifications) so no real emails leave your machine during local development or testing.
+- **SMTP Endpoint**: `mailhog:1025` (configured automatically in `docker-compose.yml`).
+- **Web Inbox**: Open `http://localhost:8025` in your browser to read captured emails and click invitation/reset links.
+- **Production**: Point `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM` in `.env` to your real SMTP provider (such as Amazon SES, Postmark, or Microsoft 365). Note that Admins can also create users directly with an initial password in **Administration -> Users & Invitations** without sending email.
+
 ## Architecture Overview
 
 - **Frontend (`apps/web`)**: React 19, TypeScript, Vite, Tailwind CSS, React Router, TanStack Query, React Hook Form, Zod, Recharts, SimpleWebAuthn browser client, `vite-plugin-pwa`.

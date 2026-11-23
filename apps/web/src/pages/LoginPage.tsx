@@ -82,7 +82,7 @@ export function LoginPage() {
           type="button"
           onClick={handlePasskeyLogin}
           disabled={busy}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-teal-700 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-100 disabled:opacity-50 dark:border-teal-600 dark:bg-teal-950/50 dark:text-teal-300 dark:hover:bg-teal-950"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#1e3a5f] bg-slate-100 px-4 py-2.5 text-sm font-semibold text-[#1e3a5f] hover:bg-slate-200 disabled:opacity-50 dark:border-[#1e3a5f] dark:bg-teal-950/50 dark:text-blue-300 dark:hover:bg-teal-950"
         >
           <KeyRound className="h-4 w-4" />
           Sign in with a passkey
@@ -137,7 +137,7 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+            className="w-full rounded-lg bg-[#1e3a5f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#162d4a] disabled:opacity-50"
           >
             {busy ? 'Signing in...' : 'Sign in'}
           </button>
@@ -148,7 +148,7 @@ export function LoginPage() {
             <ShieldCheck className="h-3.5 w-3.5 text-teal-600" />
             Invite-only access
           </span>
-          <Link to="/forgot-password" className="text-teal-700 hover:underline dark:text-teal-400">
+          <Link to="/forgot-password" className="text-[#1e3a5f] hover:underline dark:text-blue-400">
             Forgot password?
           </Link>
         </div>

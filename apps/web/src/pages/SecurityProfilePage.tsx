@@ -221,7 +221,7 @@ export function SecurityProfilePage() {
       </div>
 
       {message && (
-        <div className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-teal-800 dark:border-teal-900 dark:bg-teal-950/40 dark:text-teal-300">
+        <div className="rounded-lg border border-teal-200 bg-slate-100 p-3 text-sm text-[#1e3a5f] dark:border-teal-900 dark:bg-teal-950/40 dark:text-blue-300">
           {message}
         </div>
       )}
@@ -234,7 +234,7 @@ export function SecurityProfilePage() {
       {/* Passkeys */}
       <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <KeyRound className="h-5 w-5 text-teal-700" />
+          <KeyRound className="h-5 w-5 text-[#1e3a5f]" />
           Passkeys (WebAuthn / FIDO2)
         </h2>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -248,7 +248,7 @@ export function SecurityProfilePage() {
           <button
             type="button"
             onClick={addPasskey}
-            className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+            className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white hover:bg-[#162d4a]"
           >
             Add Passkey
           </button>
@@ -285,12 +285,12 @@ export function SecurityProfilePage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <Smartphone className="h-5 w-5 text-teal-700" />
+              <Smartphone className="h-5 w-5 text-[#1e3a5f]" />
               Authenticator App (TOTP)
             </h2>
             <p className="text-xs text-slate-500">
               Status:{' '}
-              <strong className={session?.hasTotpEnrolled ? 'text-teal-700 dark:text-teal-400' : ''}>
+              <strong className={session?.hasTotpEnrolled ? 'text-[#1e3a5f] dark:text-blue-400' : ''}>
                 {session?.hasTotpEnrolled ? 'Enrolled' : 'Not enrolled'}
               </strong>{' '}
               (You can use both Passkeys and an Authenticator App.)
@@ -300,7 +300,7 @@ export function SecurityProfilePage() {
             <button
               type="button"
               onClick={startTotpSetup}
-              className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+              className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white hover:bg-[#162d4a]"
             >
               {session?.hasTotpEnrolled ? 'Reconfigure TOTP' : 'Enrol Authenticator App'}
             </button>
@@ -328,7 +328,7 @@ export function SecurityProfilePage() {
               />
               <button
                 type="submit"
-                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#162d4a]"
               >
                 Verify & Activate
               </button>
@@ -375,7 +375,7 @@ export function SecurityProfilePage() {
       {(aiCfgData?.allowUserOverride || session?.user.role === 'admin') && (
         <section className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <Sparkles className="h-5 w-5 text-teal-700" />
+            <Sparkles className="h-5 w-5 text-[#1e3a5f]" />
             My AI Insights LLM Configuration
           </h2>
           <p className="mt-1 text-xs text-slate-500">
@@ -446,7 +446,7 @@ export function SecurityProfilePage() {
             <div className="sm:col-span-2">
               <button
                 type="submit"
-                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+                className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white hover:bg-[#162d4a]"
               >
                 Save Personal LLM Settings
               </button>
@@ -483,7 +483,7 @@ export function SecurityProfilePage() {
           <div className="sm:col-span-2">
             <button
               type="submit"
-              className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+              className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white hover:bg-[#162d4a]"
             >
               Update password
             </button>

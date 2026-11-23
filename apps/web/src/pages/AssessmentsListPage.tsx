@@ -71,7 +71,7 @@ export function AssessmentsListPage() {
                   <td className="px-4 py-3 font-medium">
                     <Link
                       to={`/assessments/${a.id}`}
-                      className="text-teal-700 hover:underline dark:text-teal-400"
+                      className="text-[#1e3a5f] hover:underline dark:text-blue-400"
                     >
                       {a.title}
                     </Link>

@@ -15,7 +15,7 @@ import {
   Tooltip,
   CartesianGrid
 } from 'recharts';
-import { Download, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Download, CheckCircle2, AlertTriangle, ArrowUpRight } from 'lucide-react';
 import { apiFetch, ApiError, downloadFile } from '../lib/api';
 import { useAuth } from '../lib/auth';
 
@@ -97,15 +97,18 @@ export function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Governance Portfolio Dashboard</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Executive Governance Command Centre
+          </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            FRAME maturity posture across AI deployments in your authorised scope.
+            Evidence-based portfolio view across FRAME governance maturity, assessments, and
+            remediation actions.
           </p>
         </div>
         <button
           type="button"
           onClick={handleExportPortfolio}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+          className="inline-flex items-center gap-2 rounded-lg bg-[#1e3a5f] px-3.5 py-2 text-sm font-medium text-white hover:bg-[#162d4a] dark:bg-blue-600 dark:hover:bg-blue-700"
         >
           <Download className="h-4 w-4" />
           Export Portfolio CSV
@@ -114,27 +117,27 @@ export function DashboardPage() {
 
       {/* First-run Admin Onboarding Checklist */}
       {session?.user.role === 'admin' && data.summary.totalAiSystems === 0 && (
-        <div className="rounded-xl border border-teal-200 bg-teal-50/70 p-5 dark:border-teal-900 dark:bg-teal-950/30">
+        <div className="rounded-xl border border-teal-200 bg-slate-100/70 p-5 dark:border-teal-900 dark:bg-teal-950/30">
           <h2 className="font-semibold text-teal-900 dark:text-teal-200">
             First-Run Administrator Onboarding Checklist
           </h2>
           <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-teal-700" />
+              <CheckCircle2 className="h-4 w-4 text-[#1e3a5f]" />
               <span>MFA enrolled for Administrator account</span>
             </li>
             <li className="flex items-center gap-2">
-              <Link to="/admin" className="text-teal-800 underline dark:text-teal-300">
+              <Link to="/admin" className="text-[#1e3a5f] underline dark:text-blue-300">
                 1. Create Organisation & Business Units in Administration
               </Link>
             </li>
             <li className="flex items-center gap-2">
-              <Link to="/admin" className="text-teal-800 underline dark:text-teal-300">
+              <Link to="/admin" className="text-[#1e3a5f] underline dark:text-blue-300">
                 2. Invite Users, Reviewers, and Auditors
               </Link>
             </li>
             <li className="flex items-center gap-2">
-              <Link to="/systems" className="text-teal-800 underline dark:text-teal-300">
+              <Link to="/systems" className="text-[#1e3a5f] underline dark:text-blue-300">
                 3. Register your first AI System and start a FRAME assessment
               </Link>
             </li>
@@ -187,30 +190,61 @@ export function DashboardPage() {
 
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-medium text-slate-500">AI Systems</p>
-          <p className="mt-1 text-2xl font-bold">{data.summary.totalAiSystems}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-medium text-slate-500">Total Assessments</p>
-          <p className="mt-1 text-2xl font-bold">{data.summary.totalAssessments}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <Link
+          to="/systems"
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-slate-300 dark:border-slate-800 dark:bg-[#111827]"
+        >
+          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+            <span>AI Systems</span>
+            <ArrowUpRight className="h-3.5 w-3.5 text-slate-400" />
+          </div>
+          <p className="tabular-nums mt-1.5 text-2xl font-bold text-slate-900 dark:text-white">
+            {data.summary.totalAiSystems}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">Registered in scope</p>
+        </Link>
+        <Link
+          to="/assessments"
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-slate-300 dark:border-slate-800 dark:bg-[#111827]"
+        >
+          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+            <span>Total Assessments</span>
+            <ArrowUpRight className="h-3.5 w-3.5 text-slate-400" />
+          </div>
+          <p className="tabular-nums mt-1.5 text-2xl font-bold text-slate-900 dark:text-white">
+            {data.summary.totalAssessments}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">5-Dimension Envelope</p>
+        </Link>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-[#111827]">
           <p className="text-xs font-medium text-slate-500">Approved</p>
-          <p className="mt-1 text-2xl font-bold text-teal-700 dark:text-teal-400">
+          <p className="tabular-nums mt-1.5 text-2xl font-bold text-[#009E73]">
             {data.summary.assessmentsByStatus.approved ?? 0}
           </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">Locked governance snapshots</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-medium text-slate-500">Open Actions</p>
-          <p className="mt-1 text-2xl font-bold">{data.summary.openActions}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <Link
+          to="/actions"
+          className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-slate-300 dark:border-slate-800 dark:bg-[#111827]"
+        >
+          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+            <span>Open Actions</span>
+            <ArrowUpRight className="h-3.5 w-3.5 text-slate-400" />
+          </div>
+          <p className="tabular-nums mt-1.5 text-2xl font-bold text-slate-900 dark:text-white">
+            {data.summary.openActions}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">Remediation tracker</p>
+        </Link>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-[#111827]">
           <p className="flex items-center gap-1 text-xs font-medium text-slate-500">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+            <AlertTriangle className="h-3.5 w-3.5 text-[#E69F00]" />
             Overdue Reviews
           </p>
-          <p className="mt-1 text-2xl font-bold text-amber-600">{data.summary.overdueReviews}</p>
+          <p className="tabular-nums mt-1.5 text-2xl font-bold text-[#D55E00]">
+            {data.summary.overdueReviews}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">Requiring immediate oversight</p>
         </div>
       </div>
 
@@ -228,9 +262,9 @@ export function DashboardPage() {
                 <Radar
                   name="Portfolio Average"
                   dataKey="averageScore"
-                  stroke="#0f766e"
-                  fill="#0f766e"
-                  fillOpacity={0.35}
+                  stroke="#0072B2"
+                  fill="#0072B2"
+                  fillOpacity={0.3}
                 />
                 <Tooltip />
               </RadarChart>
@@ -257,8 +291,8 @@ export function DashboardPage() {
                     type="monotone"
                     dataKey="overallScore"
                     name="Overall Score"
-                    stroke="#0f766e"
-                    strokeWidth={2}
+                    stroke="#0072B2"
+                    strokeWidth={2.5}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -290,7 +324,7 @@ export function DashboardPage() {
                   <td className="py-2.5 pr-4 font-medium">
                     <Link
                       to={`/systems/${row.aiSystemId}`}
-                      className="text-teal-700 hover:underline dark:text-teal-400"
+                      className="text-[#1e3a5f] hover:underline dark:text-blue-400"
                     >
                       {row.name}
                     </Link>

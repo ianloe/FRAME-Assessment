@@ -105,7 +105,7 @@ export function AuditorWorkspacePage() {
       {isAuditor && (
         <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <Plus className="h-5 w-5 text-teal-700" />
+            <Plus className="h-5 w-5 text-[#1e3a5f]" />
             Record Audit Finding or Observation
           </h2>
           <form onSubmit={handleCreateFinding} className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -159,7 +159,7 @@ export function AuditorWorkspacePage() {
             <div className="sm:col-span-2">
               <button
                 type="submit"
-                className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#162d4a]"
               >
                 Record Finding
               </button>
@@ -208,7 +208,7 @@ export function AuditorWorkspacePage() {
                     <button
                       type="button"
                       onClick={() => handleRespond(f.id)}
-                      className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-medium text-white"
+                      className="rounded-lg bg-[#1e3a5f] px-3 py-1.5 text-xs font-medium text-white"
                     >
                       Respond
                     </button>
@@ -230,7 +230,7 @@ export function AuditorWorkspacePage() {
           <button
             type="button"
             onClick={handleVerifyChain}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-800"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#1e3a5f] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#162d4a]"
           >
             <ShieldCheck className="h-4 w-4" />
             Verify Hash Chain Integrity

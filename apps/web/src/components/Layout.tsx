@@ -68,22 +68,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="flex min-h-screen bg-[#f8fafc] text-slate-900 dark:bg-[#0b1120] dark:text-slate-100">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform border-r border-slate-200 bg-white transition-transform dark:border-slate-800 dark:bg-slate-900 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-60 transform border-r border-slate-200 bg-white transition-transform dark:border-slate-800 dark:bg-[#111827] lg:static lg:translate-x-0 ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         aria-label="Primary navigation"
       >
-        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5 dark:border-slate-800">
+        <div className="flex h-14 items-center justify-between border-b border-slate-200 px-4 dark:border-slate-800">
           <Link to="/" className="flex items-center gap-2.5 font-semibold tracking-tight">
             <img
               src="/frame-logo.png"
               alt="FRAME logo"
               className="h-8 w-8 rounded-lg object-contain"
             />
-            <span className="text-base text-slate-900 dark:text-white">FRAME Platform</span>
+            <div className="leading-tight">
+              <span className="block text-sm font-bold tracking-wide text-[#1e3a5f] dark:text-white">
+                FRAME
+              </span>
+              <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                AI Governance
+              </span>
+            </div>
           </Link>
           <button
             type="button"
@@ -105,10 +112,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 end={item.to === '/'}
                 onClick={() => setMobileOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
                     isActive
-                      ? 'bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300'
-                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                      ? 'bg-[#1e3a5f] text-white shadow-xs dark:bg-blue-600'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
                   }`
                 }
               >
@@ -119,10 +126,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t border-slate-200 p-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <div className="absolute bottom-0 left-0 right-0 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
           <p className="font-medium text-slate-700 dark:text-slate-300">{session?.user.name}</p>
           <p className="mt-0.5 capitalize">
-            Role: {session?.user.role}
+            {session?.user.role}
             {session?.user.isReviewer && session.user.role === 'user' ? ' (Reviewer)' : ''}
           </p>
         </div>
@@ -130,7 +137,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 sm:px-6">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur dark:border-slate-800 dark:bg-[#111827]/95 sm:px-6">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
@@ -140,11 +147,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="hidden text-xs text-slate-500 sm:block dark:text-slate-400">
-            FRAME: A governance framework for enterprise AI deployment
+          <div className="hidden text-xs font-medium text-slate-500 sm:block dark:text-slate-400">
+            FRAME Governance Envelope &amp; Enterprise AI Assessment
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="hidden items-center gap-2 text-xs sm:flex">
+              <span className="font-medium text-slate-700 dark:text-slate-200">
+                {session?.user.name}
+              </span>
+              <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium capitalize text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                {session?.user.role}
+              </span>
+            </div>
             <div className="relative">
               <button
                 type="button"
@@ -152,9 +167,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                 aria-label="Notifications"
               >
-                <Bell className="h-5 w-5" />
+                <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
-                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500" />
+                  <span className="absolute right-0.5 top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                    {unreadCount}
+                  </span>
                 )}
               </button>
               {notifOpen && (

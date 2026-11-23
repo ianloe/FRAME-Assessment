@@ -208,7 +208,7 @@ export function SystemDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowNewAssessment(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#162d4a]"
               >
                 <Plus className="h-4 w-4" />
                 New Assessment
@@ -252,7 +252,7 @@ export function SystemDetailPage() {
                 href={sys.aaefUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="ml-1.5 inline-flex items-center text-teal-700 hover:underline dark:text-teal-400"
+                className="ml-1.5 inline-flex items-center text-[#1e3a5f] hover:underline dark:text-blue-400"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
@@ -266,7 +266,7 @@ export function SystemDetailPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <Sparkles className="h-5 w-5 text-teal-700" />
+              <Sparkles className="h-5 w-5 text-[#1e3a5f]" />
               AI Governance Insights
             </h2>
             <p className="text-xs text-slate-500">
@@ -274,7 +274,7 @@ export function SystemDetailPage() {
               system.
             </p>
           </div>
-          <Link to="/security" className="text-xs text-teal-700 hover:underline dark:text-teal-400">
+          <Link to="/security" className="text-xs text-[#1e3a5f] hover:underline dark:text-blue-400">
             Configure personal LLM
           </Link>
         </div>
@@ -312,7 +312,7 @@ export function SystemDetailPage() {
                 setAiLoading(false);
               }
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#162d4a] disabled:opacity-50"
           >
             <Sparkles className="h-4 w-4" />
             {aiLoading ? 'Generating...' : 'Generate AI Insights'}
@@ -346,7 +346,7 @@ export function SystemDetailPage() {
               <div>
                 <Link
                   to={`/assessments/${a.id}`}
-                  className="font-semibold text-teal-700 hover:underline dark:text-teal-400"
+                  className="font-semibold text-[#1e3a5f] hover:underline dark:text-blue-400"
                 >
                   {a.title}
                 </Link>
@@ -385,7 +385,7 @@ export function SystemDetailPage() {
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <CheckSquare className="h-5 w-5 text-teal-700" />
+            <CheckSquare className="h-5 w-5 text-[#1e3a5f]" />
             FRAME Implementation Checklists
           </h2>
           {canEdit && (
@@ -403,7 +403,7 @@ export function SystemDetailPage() {
               <button
                 type="button"
                 onClick={handleStartChecklist}
-                className="rounded-lg bg-teal-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
+                className="rounded-lg bg-[#1e3a5f] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#162d4a]"
               >
                 Start Checklist
               </button>
@@ -548,7 +548,7 @@ export function SystemDetailPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                  className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#162d4a]"
                 >
                   Save Changes
                 </button>
@@ -627,7 +627,7 @@ export function SystemDetailPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                  className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#162d4a]"
                 >
                   Create Assessment
                 </button>

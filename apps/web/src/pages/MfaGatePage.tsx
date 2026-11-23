@@ -122,7 +122,7 @@ export function MfaGatePage() {
               await refetchSession();
               navigate('/');
             }}
-            className="mt-6 w-full rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800"
+            className="mt-6 w-full rounded-lg bg-[#1e3a5f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#162d4a]"
           >
             I have saved my recovery codes, continue to dashboard
           </button>
@@ -136,7 +136,7 @@ export function MfaGatePage() {
       <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-teal-700" />
+            <ShieldCheck className="h-6 w-6 text-[#1e3a5f]" />
             <h1 className="text-xl font-bold">
               {session.hasMfaEnrolled ? 'Two-Factor Verification' : 'Enrol Multi-Factor Authentication'}
             </h1>
@@ -165,7 +165,7 @@ export function MfaGatePage() {
             {/* Option A: Passkey */}
             <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
               <div className="flex items-center gap-2 font-semibold">
-                <KeyRound className="h-4 w-4 text-teal-700" />
+                <KeyRound className="h-4 w-4 text-[#1e3a5f]" />
                 Option 1: Register a Passkey (Recommended)
               </div>
               <p className="mt-1 text-xs text-slate-500">
@@ -183,7 +183,7 @@ export function MfaGatePage() {
                   type="button"
                   disabled={busy}
                   onClick={enrolPasskey}
-                  className="rounded-lg bg-teal-700 px-4 py-1.5 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50"
+                  className="rounded-lg bg-[#1e3a5f] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#162d4a] disabled:opacity-50"
                 >
                   Register Passkey
                 </button>
@@ -193,7 +193,7 @@ export function MfaGatePage() {
             {/* Option B: TOTP */}
             <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
               <div className="flex items-center gap-2 font-semibold">
-                <Smartphone className="h-4 w-4 text-teal-700" />
+                <Smartphone className="h-4 w-4 text-[#1e3a5f]" />
                 Option 2: Authenticator App (TOTP)
               </div>
               {!setupData ? (
@@ -227,7 +227,7 @@ export function MfaGatePage() {
                     <button
                       type="submit"
                       disabled={busy}
-                      className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                      className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#162d4a]"
                     >
                       Verify & Activate
                     </button>
@@ -247,7 +247,7 @@ export function MfaGatePage() {
                 }}
                 className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium ${
                   mode === 'totp'
-                    ? 'bg-teal-700 text-white'
+                    ? 'bg-[#1e3a5f] text-white'
                     : 'border border-slate-300 dark:border-slate-700'
                 }`}
               >
@@ -261,7 +261,7 @@ export function MfaGatePage() {
                 }}
                 className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium ${
                   mode === 'recovery'
-                    ? 'bg-teal-700 text-white'
+                    ? 'bg-[#1e3a5f] text-white'
                     : 'border border-slate-300 dark:border-slate-700'
                 }`}
               >
@@ -286,7 +286,7 @@ export function MfaGatePage() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+              className="w-full rounded-lg bg-[#1e3a5f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#162d4a] disabled:opacity-50"
             >
               {busy ? 'Verifying...' : 'Verify'}
             </button>

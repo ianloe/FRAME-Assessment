@@ -116,7 +116,7 @@ export function AcceptInvitePage() {
                         className={`h-1.5 flex-1 rounded ${
                           idx < strength.score
                             ? strength.acceptable
-                              ? 'bg-teal-600'
+                              ? 'bg-[#0072B2]'
                               : 'bg-amber-500'
                             : 'bg-slate-200 dark:bg-slate-700'
                         }`}
@@ -147,7 +147,7 @@ export function AcceptInvitePage() {
             <button
               type="submit"
               disabled={busy || !strength?.acceptable}
-              className="w-full rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"
+              className="w-full rounded-lg bg-[#1e3a5f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#162d4a] disabled:opacity-50"
             >
               {busy ? 'Activating account...' : 'Set password and continue to MFA setup'}
             </button>

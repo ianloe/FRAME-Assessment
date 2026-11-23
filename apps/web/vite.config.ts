@@ -14,7 +14,7 @@ export default defineConfig({
         name: 'FRAME Assessment Platform',
         short_name: 'FRAME',
         description: 'Enterprise AI governance assessment, review and audit platform',
-        theme_color: '#0f766e',
+        theme_color: '#1e3a5f',
         background_color: '#f8fafc',
         display: 'standalone',
         start_url: '/',

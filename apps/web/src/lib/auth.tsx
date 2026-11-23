@@ -185,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 <button
                   type="submit"
                   disabled={stepUpBusy}
-                  className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50"
+                  className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-medium text-white hover:bg-[#162d4a] disabled:opacity-50"
                 >
                   {stepUpBusy ? 'Verifying...' : 'Verify'}
                 </button>

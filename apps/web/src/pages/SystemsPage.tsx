@@ -1,0 +1,401 @@
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { Plus, Download, Upload, Search } from 'lucide-react';
+import { apiFetch, ApiError, downloadFile } from '../lib/api';
+import { useAuth } from '../lib/auth';
+
+interface AISystem {
+  id: string;
+  organisationId: string;
+  name: string;
+  description: string;
+  lifecycleStage: string;
+  deploymentType: string;
+  riskTier: string;
+  targetMaturityLevel: number;
+  regulatoryTags: string[];
+  aaefReference: string;
+  isDemo: boolean;
+}
+
+export function SystemsPage() {
+  const { session, openStepUp } = useAuth();
+  const canEdit = session?.user.role === 'admin' || session?.user.role === 'user';
+
+  const [search, setSearch] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [csvText, setCsvText] = useState(
+    'name,description,lifecycleStage,deploymentType,riskTier,targetMaturityLevel,aaefReference\n'
+  );
+  const [importPreview, setImportPreview] = useState<Array<{
+    rowNumber: number;
+    valid: boolean;
+    data: unknown;
+    errors: string[];
+  }> | null>(null);
+
+  const [form, setForm] = useState({
+    organisationId: '',
+    name: '',
+    description: '',
+    lifecycleStage: 'pilot',
+    deploymentType: 'copilot',
+    vendorOrInhouse: 'in_house',
+    riskTier: 'medium',
+    targetMaturityLevel: 3,
+    aaefReference: '',
+    aaefUrl: ''
+  });
+  const [error, setError] = useState('');
+
+  const { data: orgData } = useQuery<{ organisations: Array<{ id: string; name: string }> }>({
+    queryKey: ['organisations'],
+    queryFn: () => apiFetch('/api/organisations')
+  });
+
+  const { data, isLoading, refetch } = useQuery<{ aiSystems: AISystem[] }>({
+    queryKey: ['ai-systems', search],
+    queryFn: () =>
+      apiFetch(`/api/ai-systems${search ? `?search=${encodeURIComponent(search)}` : ''}`)
+  });
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const orgId = form.organisationId || orgData?.organisations[0]?.id;
+      if (!orgId) {
+        setError('Please create an organisation in Administration first.');
+        return;
+      }
+      await apiFetch('/api/ai-systems', {
+        method: 'POST',
+        body: JSON.stringify({ ...form, organisationId: orgId })
+      });
+      setShowCreate(false);
+      setForm({
+        organisationId: '',
+        name: '',
+        description: '',
+        lifecycleStage: 'pilot',
+        deploymentType: 'copilot',
+        vendorOrInhouse: 'in_house',
+        riskTier: 'medium',
+        targetMaturityLevel: 3,
+        aaefReference: '',
+        aaefUrl: ''
+      });
+      await refetch();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      await downloadFile('/api/ai-systems/export/csv', 'frame-ai-systems.csv');
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'STEP_UP_REQUIRED') {
+        openStepUp(() => void handleExportCsv());
+      }
+    }
+  };
+
+  const handlePreviewCsv = async () => {
+    const orgId = orgData?.organisations[0]?.id;
+    if (!orgId) return;
+    const res = await apiFetch<{ rows: typeof importPreview }>('/api/ai-systems/import-preview', {
+      method: 'POST',
+      body: JSON.stringify({ csvText, organisationId: orgId })
+    });
+    setImportPreview(res.rows);
+  };
+
+  const handleCommitImport = async () => {
+    if (!importPreview) return;
+    const validItems = importPreview.filter((r) => r.valid && r.data).map((r) => r.data);
+    if (validItems.length === 0) return;
+    await apiFetch('/api/ai-systems/import', {
+      method: 'POST',
+      body: JSON.stringify({ items: validItems })
+    });
+    setShowImport(false);
+    setImportPreview(null);
+    await refetch();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">AI System Register</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Inventory of AI deployments governed under FRAME and linked to AAEF evaluations.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
+          {canEdit && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowImport(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900"
+              >
+                <Upload className="h-4 w-4" />
+                Import CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCreate(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3.5 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+              >
+                <Plus className="h-4 w-4" />
+                Register AI System
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <input
+          type="search"
+          placeholder="Search AI systems or AAEF references..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+        />
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-slate-500">Loading AI systems...</p>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {(data?.aiSystems ?? []).map((sys) => (
+            <Link
+              key={sys.id}
+              to={`/systems/${sys.id}`}
+              className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 transition hover:border-teal-500 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="font-semibold text-slate-900 dark:text-white">{sys.name}</h2>
+                  <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium capitalize dark:bg-slate-800">
+                    {sys.riskTier}
+                  </span>
+                </div>
+                <p className="mt-2 line-clamp-2 text-xs text-slate-600 dark:text-slate-400">
+                  {sys.description}
+                </p>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-1.5 text-xs">
+                <span className="rounded bg-teal-50 px-2 py-0.5 text-teal-800 capitalize dark:bg-teal-950/60 dark:text-teal-300">
+                  {sys.lifecycleStage}
+                </span>
+                <span className="rounded bg-slate-100 px-2 py-0.5 capitalize dark:bg-slate-800">
+                  {sys.deploymentType.replace('_', ' ')}
+                </span>
+                {sys.aaefReference && (
+                  <span className="rounded bg-indigo-50 px-2 py-0.5 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300">
+                    {sys.aaefReference}
+                  </span>
+                )}
+              </div>
+            </Link>
+          ))}
+          {(data?.aiSystems ?? []).length === 0 && (
+            <div className="col-span-full rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 dark:border-slate-700">
+              No AI systems registered yet.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <h2 className="text-lg font-bold">Register AI System</h2>
+            <form onSubmit={handleCreate} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium">Organisation</label>
+                <select
+                  value={form.organisationId || orgData?.organisations[0]?.id || ''}
+                  onChange={(e) => setForm({ ...form, organisationId: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                >
+                  {(orgData?.organisations ?? []).map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">System Name</label>
+                <input
+                  type="text"
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Description</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium">Lifecycle Stage</label>
+                  <select
+                    value={form.lifecycleStage}
+                    onChange={(e) => setForm({ ...form, lifecycleStage: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <option value="idea">Idea</option>
+                    <option value="pilot">Pilot</option>
+                    <option value="production">Production</option>
+                    <option value="retired">Retired</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Deployment Type</label>
+                  <select
+                    value={form.deploymentType}
+                    onChange={(e) => setForm({ ...form, deploymentType: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <option value="assistant">Assistant</option>
+                    <option value="copilot">Copilot</option>
+                    <option value="autonomous_agent">Autonomous Agent</option>
+                    <option value="multi_agent">Multi-Agent</option>
+                    <option value="predictive_model">Predictive Model</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Risk Tier</label>
+                  <select
+                    value={form.riskTier}
+                    onChange={(e) => setForm({ ...form, riskTier: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium">Target Maturity (1-4)</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="1"
+                    max="4"
+                    value={form.targetMaturityLevel}
+                    onChange={(e) => setForm({ ...form, targetMaturityLevel: Number(e.target.value) })}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">AAEF Cross-Reference (optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. AAEF-CS-001 (Profile: Assisted Responder)"
+                  value={form.aaefReference}
+                  onChange={(e) => setForm({ ...form, aaefReference: e.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                />
+              </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreate(false)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm dark:border-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                >
+                  Create System
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Import Modal */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+            <h2 className="text-lg font-bold">Bulk Import AI Systems (CSV)</h2>
+            <textarea
+              rows={6}
+              value={csvText}
+              onChange={(e) => setCsvText(e.target.value)}
+              className="mt-3 w-full rounded-lg border border-slate-300 p-2 font-mono text-xs dark:border-slate-700 dark:bg-slate-800"
+            />
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={handlePreviewCsv}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium dark:border-slate-700"
+              >
+                Validate Preview
+              </button>
+              {importPreview && (
+                <button
+                  type="button"
+                  onClick={handleCommitImport}
+                  className="rounded-lg bg-teal-700 px-3 py-1.5 text-sm font-medium text-white"
+                >
+                  Import Valid Rows ({importPreview.filter((r) => r.valid).length})
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowImport(false)}
+                className="ml-auto rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700"
+              >
+                Close
+              </button>
+            </div>
+            {importPreview && (
+              <ul className="mt-3 space-y-1 text-xs">
+                {importPreview.map((r) => (
+                  <li key={r.rowNumber} className={r.valid ? 'text-teal-700' : 'text-red-600'}>
+                    Row {r.rowNumber}: {r.valid ? 'Valid' : r.errors.join(', ')}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

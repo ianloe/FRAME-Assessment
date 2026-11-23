@@ -1,0 +1,333 @@
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import {
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid
+} from 'recharts';
+import { Download, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { apiFetch, ApiError, downloadFile } from '../lib/api';
+import { useAuth } from '../lib/auth';
+
+interface DashboardResponse {
+  summary: {
+    totalAiSystems: number;
+    totalAssessments: number;
+    assessmentsByStatus: Record<string, number>;
+    overdueReviews: number;
+    openActions: number;
+    evidenceNearingExpiry: number;
+  };
+  portfolioDimensionAverages: Array<{
+    dimensionCode: string;
+    dimensionName: string;
+    averageScore: number;
+  }>;
+  heatmap: Array<{
+    aiSystemId: string;
+    name: string;
+    riskTier: string;
+    overallScore: number | null;
+    dimensions: Record<string, number | null>;
+  }>;
+  trend: Array<{
+    date: string;
+    title: string;
+    aiSystemName: string;
+    overallScore: number;
+  }>;
+}
+
+function scoreCellClass(score: number | null): string {
+  if (score === null) return 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
+  if (score < 2.0) return 'bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-200';
+  if (score < 3.0) return 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200';
+  if (score < 3.5) return 'bg-teal-100 text-teal-900 dark:bg-teal-950/60 dark:text-teal-200';
+  return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200';
+}
+
+export function DashboardPage() {
+  const { session, openStepUp } = useAuth();
+  const [riskTier, setRiskTier] = useState('');
+  const [lifecycleStage, setLifecycleStage] = useState('');
+  const [organisationId, setOrganisationId] = useState('');
+
+  const { data: orgData } = useQuery<{
+    organisations: Array<{ id: string; name: string }>;
+  }>({
+    queryKey: ['organisations'],
+    queryFn: () => apiFetch('/api/organisations')
+  });
+
+  const params = new URLSearchParams();
+  if (riskTier) params.set('riskTier', riskTier);
+  if (lifecycleStage) params.set('lifecycleStage', lifecycleStage);
+  if (organisationId) params.set('organisationId', organisationId);
+
+  const { data, isLoading } = useQuery<DashboardResponse>({
+    queryKey: ['dashboard', riskTier, lifecycleStage, organisationId],
+    queryFn: () => apiFetch(`/api/dashboard?${params.toString()}`)
+  });
+
+  const handleExportPortfolio = async () => {
+    try {
+      await downloadFile('/api/reports/portfolio/csv', 'frame-portfolio-report.csv');
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'STEP_UP_REQUIRED') {
+        openStepUp(() => void handleExportPortfolio());
+      }
+    }
+  };
+
+  if (isLoading || !data) {
+    return <div className="p-6 text-sm text-slate-500">Loading governance portfolio...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Governance Portfolio Dashboard</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            FRAME maturity posture across AI deployments in your authorised scope.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleExportPortfolio}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+        >
+          <Download className="h-4 w-4" />
+          Export Portfolio CSV
+        </button>
+      </div>
+
+      {/* First-run Admin Onboarding Checklist */}
+      {session?.user.role === 'admin' && data.summary.totalAiSystems === 0 && (
+        <div className="rounded-xl border border-teal-200 bg-teal-50/70 p-5 dark:border-teal-900 dark:bg-teal-950/30">
+          <h2 className="font-semibold text-teal-900 dark:text-teal-200">
+            First-Run Administrator Onboarding Checklist
+          </h2>
+          <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-teal-700" />
+              <span>MFA enrolled for Administrator account</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Link to="/admin" className="text-teal-800 underline dark:text-teal-300">
+                1. Create Organisation & Business Units in Administration
+              </Link>
+            </li>
+            <li className="flex items-center gap-2">
+              <Link to="/admin" className="text-teal-800 underline dark:text-teal-300">
+                2. Invite Users, Reviewers, and Auditors
+              </Link>
+            </li>
+            <li className="flex items-center gap-2">
+              <Link to="/systems" className="text-teal-800 underline dark:text-teal-300">
+                3. Register your first AI System and start a FRAME assessment
+              </Link>
+            </li>
+          </ul>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <select
+          aria-label="Filter by organisation"
+          value={organisationId}
+          onChange={(e) => setOrganisationId(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          <option value="">All organisations</option>
+          {(orgData?.organisations ?? []).map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          aria-label="Filter by risk tier"
+          value={riskTier}
+          onChange={(e) => setRiskTier(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          <option value="">All risk tiers</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+
+        <select
+          aria-label="Filter by lifecycle stage"
+          value={lifecycleStage}
+          onChange={(e) => setLifecycleStage(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          <option value="">All lifecycle stages</option>
+          <option value="idea">Idea</option>
+          <option value="pilot">Pilot</option>
+          <option value="production">Production</option>
+          <option value="retired">Retired</option>
+        </select>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs font-medium text-slate-500">AI Systems</p>
+          <p className="mt-1 text-2xl font-bold">{data.summary.totalAiSystems}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs font-medium text-slate-500">Total Assessments</p>
+          <p className="mt-1 text-2xl font-bold">{data.summary.totalAssessments}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs font-medium text-slate-500">Approved</p>
+          <p className="mt-1 text-2xl font-bold text-teal-700 dark:text-teal-400">
+            {data.summary.assessmentsByStatus.approved ?? 0}
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs font-medium text-slate-500">Open Actions</p>
+          <p className="mt-1 text-2xl font-bold">{data.summary.openActions}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <p className="flex items-center gap-1 text-xs font-medium text-slate-500">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+            Overdue Reviews
+          </p>
+          <p className="mt-1 text-2xl font-bold text-amber-600">{data.summary.overdueReviews}</p>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-base font-semibold">Portfolio Maturity by FRAME Dimension</h2>
+          <p className="text-xs text-slate-500">Target for production deployments: 3.00 (Defined)</p>
+          <div className="mt-4 h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={data.portfolioDimensionAverages}>
+                <PolarGrid />
+                <PolarAngleAxis dataKey="dimensionName" />
+                <PolarRadiusAxis domain={[0, 4]} tickCount={5} />
+                <Radar
+                  name="Portfolio Average"
+                  dataKey="averageScore"
+                  stroke="#0f766e"
+                  fill="#0f766e"
+                  fillOpacity={0.35}
+                />
+                <Tooltip />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-base font-semibold">Maturity Trend Over Time</h2>
+          <p className="text-xs text-slate-500">Overall FRAME score across assessment dates</p>
+          <div className="mt-4 h-72">
+            {data.trend.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                No scored assessments yet.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.trend}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis domain={[0, 4]} />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="overallScore"
+                    name="Overall Score"
+                    stroke="#0f766e"
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Heatmap */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-base font-semibold">AI Systems by Dimension Heatmap</h2>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800">
+                <th className="py-2 pr-4">AI System</th>
+                <th className="px-3 py-2">Risk</th>
+                <th className="px-3 py-2">Focus</th>
+                <th className="px-3 py-2">Roles</th>
+                <th className="px-3 py-2">Authority</th>
+                <th className="px-3 py-2">Metrics</th>
+                <th className="px-3 py-2">Evaluation</th>
+                <th className="px-3 py-2">Overall</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {data.heatmap.map((row) => (
+                <tr key={row.aiSystemId}>
+                  <td className="py-2.5 pr-4 font-medium">
+                    <Link
+                      to={`/systems/${row.aiSystemId}`}
+                      className="text-teal-700 hover:underline dark:text-teal-400"
+                    >
+                      {row.name}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 capitalize">{row.riskTier}</td>
+                  {(['FOCUS', 'ROLES', 'AUTHORITY', 'METRICS', 'EVALUATION'] as const).map((code) => {
+                    const val = row.dimensions[code];
+                    return (
+                      <td key={code} className="px-2 py-2">
+                        <span
+                          className={`inline-block w-14 rounded px-2 py-0.5 text-center text-xs font-semibold ${scoreCellClass(val)}`}
+                        >
+                          {val !== null ? val.toFixed(2) : 'N/A'}
+                        </span>
+                      </td>
+                    );
+                  })}
+                  <td className="px-2 py-2">
+                    <span
+                      className={`inline-block w-14 rounded px-2 py-0.5 text-center text-xs font-bold ${scoreCellClass(row.overallScore)}`}
+                    >
+                      {row.overallScore !== null ? row.overallScore.toFixed(2) : 'N/A'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {data.heatmap.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-6 text-center text-slate-500">
+                    No AI systems match the current filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

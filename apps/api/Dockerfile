@@ -21,13 +21,14 @@ RUN addgroup -S frame && adduser -S frame -G frame
 
 COPY --from=builder /app/package.json /app/package-lock.json ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+RUN rm -rf /app/node_modules/@frame/shared
+COPY --from=builder /app/packages/shared/package.json ./node_modules/@frame/shared/package.json
+COPY --from=builder /app/packages/shared/dist ./node_modules/@frame/shared/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/drizzle ./apps/api/drizzle
 
-RUN mkdir -p /app/uploads && chown -R frame:frame /app/uploads
+RUN mkdir -p /app/uploads && chmod -R a+rX /app && chown -R frame:frame /app/uploads
 
 USER frame
 EXPOSE 3001

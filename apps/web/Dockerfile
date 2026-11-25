@@ -14,7 +14,10 @@ COPY apps/web apps/web
 RUN npm run build --workspace=packages/shared && npm run build --workspace=apps/web
 
 FROM nginxinc/nginx-unprivileged:alpine AS runner
+USER root
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
+RUN chmod 644 /etc/nginx/conf.d/default.conf && chmod -R a+rX /usr/share/nginx/html
+USER 101
 
 EXPOSE 8080

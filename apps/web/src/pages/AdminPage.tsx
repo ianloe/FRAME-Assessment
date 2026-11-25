@@ -47,6 +47,19 @@ export function AdminPage() {
   const [buName, setBuName] = useState('');
   const [buCode, setBuCode] = useState('');
 
+  // Edit User modal state
+  const [editingUser, setEditingUser] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    role: Role;
+    isReviewer: boolean;
+    isActive: boolean;
+    mustChangePassword: boolean;
+    organisationId: string;
+    password: string;
+  } | null>(null);
+
   const { data: usersData, refetch: refetchUsers } = useQuery<{
     users: Array<{
       id: string;
@@ -55,7 +68,9 @@ export function AdminPage() {
       role: Role;
       isReviewer: boolean;
       isActive: boolean;
+      mustChangePassword: boolean;
       lastLoginAt: string | null;
+      scopes?: Array<{ organisationId: string | null }>;
     }>;
     invitations: Array<{
       id: string;
@@ -507,6 +522,26 @@ export function AdminPage() {
                       <td className="flex flex-wrap gap-2 py-2.5 text-xs">
                         <button
                           type="button"
+                          onClick={() =>
+                            setEditingUser({
+                              id: u.id,
+                              name: u.name,
+                              email: u.email,
+                              role: u.role,
+                              isReviewer: u.isReviewer,
+                              isActive: u.isActive,
+                              mustChangePassword: u.mustChangePassword,
+                              organisationId:
+                                u.scopes?.find((s) => s.organisationId)?.organisationId ?? '',
+                              password: ''
+                            })
+                          }
+                          className="rounded bg-[#1e3a5f] px-2.5 py-1 font-medium text-white hover:bg-[#162d4a]"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleToggleActive(u.id, u.isActive)}
                           className="rounded border border-slate-300 px-2 py-1 dark:border-slate-700"
                         >
@@ -535,6 +570,169 @@ export function AdminPage() {
               </table>
             </div>
           </section>
+
+          {editingUser && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
+                <h2 className="text-lg font-bold">Edit User</h2>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setError('');
+                    setMessage('');
+                    try {
+                      await apiFetch(`/api/admin/users/${editingUser.id}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({
+                          name: editingUser.name,
+                          email: editingUser.email,
+                          role: editingUser.role,
+                          isReviewer: editingUser.isReviewer,
+                          isActive: editingUser.isActive,
+                          mustChangePassword: editingUser.mustChangePassword,
+                          organisationIds: editingUser.organisationId
+                            ? [editingUser.organisationId]
+                            : [],
+                          password: editingUser.password || undefined
+                        })
+                      });
+                      setEditingUser(null);
+                      setMessage('User updated.');
+                      await refetchUsers();
+                    } catch (err) {
+                      if (err instanceof ApiError && err.code === 'STEP_UP_REQUIRED') {
+                        openStepUp();
+                      } else {
+                        setError((err as Error).message);
+                      }
+                    }
+                  }}
+                  className="mt-4 space-y-3"
+                >
+                  <div>
+                    <label className="block text-xs font-medium">Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingUser.name}
+                      onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      value={editingUser.email}
+                      onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium">Role</label>
+                      <select
+                        value={editingUser.role}
+                        onChange={(e) =>
+                          setEditingUser({ ...editingUser, role: e.target.value as Role })
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                      >
+                        <option value="user">User</option>
+                        <option value="auditor">Auditor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium">Organisation Scope</label>
+                      <select
+                        value={editingUser.organisationId}
+                        onChange={(e) =>
+                          setEditingUser({ ...editingUser, organisationId: e.target.value })
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                      >
+                        <option value="">All / None</option>
+                        {(orgData?.organisations ?? []).map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium">
+                      Reset Password (optional, min 12 chars)
+                    </label>
+                    <input
+                      type="password"
+                      minLength={12}
+                      placeholder="Leave blank to keep existing password"
+                      value={editingUser.password}
+                      onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+                    />
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editingUser.isReviewer}
+                        onChange={(e) =>
+                          setEditingUser({ ...editingUser, isReviewer: e.target.checked })
+                        }
+                      />
+                      Reviewer flag (may approve assessments authored by others)
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editingUser.isActive}
+                        onChange={(e) =>
+                          setEditingUser({ ...editingUser, isActive: e.target.checked })
+                        }
+                      />
+                      Account active
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editingUser.mustChangePassword}
+                        onChange={(e) =>
+                          setEditingUser({
+                            ...editingUser,
+                            mustChangePassword: e.target.checked
+                          })
+                        }
+                      />
+                      Require password change on next login
+                    </label>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingUser(null)}
+                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm dark:border-slate-700"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-[#1e3a5f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#162d4a]"
+                    >
+                      Save User
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

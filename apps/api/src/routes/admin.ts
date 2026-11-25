@@ -341,6 +341,10 @@ export async function adminRoutes(app: FastifyInstance) {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const body = z
       .object({
+        name: z.string().trim().min(2).max(120).optional(),
+        email: z.string().trim().email().toLowerCase().optional(),
+        password: PasswordSchema.optional(),
+        mustChangePassword: z.boolean().optional(),
         role: RoleSchema.optional(),
         isReviewer: z.boolean().optional(),
         isActive: z.boolean().optional(),
@@ -353,9 +357,39 @@ export async function adminRoutes(app: FastifyInstance) {
     const [before] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
     if (!before) return reply.code(404).send({ error: 'User not found' });
 
+    if (body.email && body.email !== before.email) {
+      const [dup] = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.email, body.email))
+        .limit(1);
+      if (dup) {
+        return reply.code(409).send({ error: 'Another user already uses this email address' });
+      }
+    }
+
+    let nextPasswordHash = before.passwordHash;
+    if (body.password) {
+      const strength = evaluatePasswordStrength(body.password, [
+        body.name ?? before.name,
+        body.email ?? before.email
+      ]);
+      if (!strength.acceptable) {
+        return reply.code(400).send({
+          error: 'Password does not meet security requirements',
+          feedback: strength.feedback
+        });
+      }
+      nextPasswordHash = await hashPassword(body.password);
+    }
+
     const [updated] = await db
       .update(schema.users)
       .set({
+        name: body.name ?? before.name,
+        email: body.email ?? before.email,
+        passwordHash: nextPasswordHash,
+        mustChangePassword: body.mustChangePassword ?? before.mustChangePassword,
         role: body.role ?? before.role,
         isReviewer: body.isReviewer ?? before.isReviewer,
         isActive: body.isActive ?? before.isActive,
@@ -392,8 +426,20 @@ export async function adminRoutes(app: FastifyInstance) {
       entityId: id,
       ipAddress: request.ip,
       userAgent: request.headers['user-agent'] ?? '',
-      beforeJson: { role: before.role, isReviewer: before.isReviewer, isActive: before.isActive },
-      afterJson: { role: updated.role, isReviewer: updated.isReviewer, isActive: updated.isActive }
+      beforeJson: {
+        name: before.name,
+        email: before.email,
+        role: before.role,
+        isReviewer: before.isReviewer,
+        isActive: before.isActive
+      },
+      afterJson: {
+        name: updated.name,
+        email: updated.email,
+        role: updated.role,
+        isReviewer: updated.isReviewer,
+        isActive: updated.isActive
+      }
     });
 
     return { ok: true };

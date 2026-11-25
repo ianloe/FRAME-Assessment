@@ -515,6 +515,45 @@ export async function adminRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  app.delete('/api/admin/users/:id', { preHandler: requireStepUp }, async (request, reply) => {
+    if (!assertPermission(request, reply, 'users:manage')) return;
+    const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+
+    if (id === request.auth!.userId) {
+      return reply.code(400).send({ error: 'You cannot remove your own currently signed-in account' });
+    }
+
+    const [target] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
+    if (!target) {
+      return reply.code(404).send({ error: 'User not found' });
+    }
+
+    if (target.role === 'admin') {
+      const admins = await db
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(and(eq(schema.users.role, 'admin'), eq(schema.users.isActive, true)));
+      if (admins.length <= 1) {
+        return reply.code(400).send({ error: 'Cannot remove the last active Administrator account' });
+      }
+    }
+
+    await db.delete(schema.users).where(eq(schema.users.id, id));
+
+    await writeAuditLog({
+      actorId: request.auth!.userId,
+      actorRole: request.auth!.role,
+      action: 'user.delete',
+      entityType: 'user',
+      entityId: id,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] ?? '',
+      beforeJson: { name: target.name, email: target.email, role: target.role }
+    });
+
+    return { ok: true };
+  });
+
   // --- Security Policy, Branding & Taxonomy ---
   app.get('/api/settings/public', async () => {
     const branding = await getSetting<BrandingSettings>('branding', DEFAULT_BRANDING_SETTINGS);

@@ -7,7 +7,7 @@ import { formatDateTime } from '../lib/date';
 import type { PermissionRule, Role } from '@frame/shared';
 
 export function AdminPage() {
-  const { openStepUp } = useAuth();
+  const { session, openStepUp } = useAuth();
   const [tab, setTab] = useState<
     'users' | 'orgs' | 'matrix' | 'questionnaires' | 'security' | 'ai_insights' | 'health'
   >('users');
@@ -261,6 +261,25 @@ export function AdminPage() {
     } catch (err) {
       if (err instanceof ApiError && err.code === 'STEP_UP_REQUIRED') {
         openStepUp(() => void handleToggleActive(userId, isActive));
+      }
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, name: string, email: string) => {
+    if (!window.confirm(`Permanently remove user "${name}" (${email})? This cannot be undone.`)) {
+      return;
+    }
+    setError('');
+    setMessage('');
+    try {
+      await apiFetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+      setMessage(`User "${name}" removed.`);
+      await refetchUsers();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'STEP_UP_REQUIRED') {
+        openStepUp(() => void handleDeleteUser(userId, name, email));
+      } else {
+        setError((err as Error).message);
       }
     }
   };
@@ -563,6 +582,15 @@ export function AdminPage() {
                         >
                           Force Sign-Out
                         </button>
+                        {u.id !== session?.user.id && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(u.id, u.name, u.email)}
+                            className="rounded border border-red-300 px-2 py-1 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400"
+                          >
+                            Remove
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
